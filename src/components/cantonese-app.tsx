@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import VoiceRecorder from "@/components/voice-recorder";
 import JyutpingText from "@/components/jyutping-text";
-import { ArrowDownUp, ArrowRight, AudioLines, BookOpen, Check, ChevronRight, Clipboard, Copy, Languages, Mic, Sparkles, Trash2 } from "lucide-react";
+import { ArrowDownUp, ArrowRight, BookOpen, Check, ChevronRight, Clipboard, Copy, Languages, Mic, Sparkles, Trash2 } from "lucide-react";
 import { convertScript, examples, MAX_LENGTH, resolveScript, translateDemo, type Direction, type Script } from "@/lib/translation";
 
 export default function CantoneseApp() {
@@ -14,6 +15,14 @@ export default function CantoneseApp() {
   const [outputScript, setOutputScript] = useState<Exclude<Script, "auto"> | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [mode, setMode] = useState<"demo" | "api">("demo");
+  const [loading, setLoading] = useState(false);
+  const request = useRef<AbortController | null>(null);
+  useEffect(() => () => { request.current?.abort(); request.current = null; }, []);
+
+  function cancelRequest() {
+    request.current?.abort(); request.current = null; setLoading(false);
+  }
   const resolved = resolveScript(input, script);
   const source = direction === "mandarin-cantonese" ? "普通话" : "粤语（白话）";
   const target = direction === "mandarin-cantonese" ? "粤语（白话）" : "普通话";
@@ -21,18 +30,41 @@ export default function CantoneseApp() {
   const characterCount = Array.from(input).length;
 
   function edit(value: string) {
-    setInput(value); setResult(""); setError(""); setNotice(""); setOutputScript(null);
+    cancelRequest(); setInput(value); setResult(""); setError(""); setNotice(""); setOutputScript(null);
   }
 
   function chooseScript(value: Script) {
-    setScript(value); setOutputScript(null);
+    cancelRequest(); setScript(value); setOutputScript(null);
     if (value !== "auto") setInput(convertScript(input, value));
   }
 
-  function translate() {
-    setNotice(""); setOutputScript(null);
-    try { setResult(translateDemo(input, direction)); setError(""); }
-    catch (cause) { setResult(""); setError(cause instanceof Error ? cause.message : "翻译失败，请重试。"); }
+  async function translate() {
+    cancelRequest(); setNotice(""); setOutputScript(null); setError(""); setResult("");
+    if (mode === "demo") {
+      try { setResult(translateDemo(input, direction)); }
+      catch (cause) { setError(cause instanceof Error ? cause.message : "翻译失败，请重试。"); }
+      return;
+    }
+    const controller = new AbortController();
+    request.current = controller; setLoading(true);
+    const timeout = window.setTimeout(() => controller.abort(), 35_000);
+    try {
+      const response = await fetch("/api/translate", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: input, direction }), signal: controller.signal,
+      });
+      const data = await response.json();
+      if (request.current !== controller) return;
+      if (!response.ok) throw new Error(typeof data.error === "string" ? data.error : "翻译失败，请重试。");
+      if (typeof data.translation !== "string" || !data.translation.trim()) throw new Error("服务返回的译文无效。");
+      setResult(data.translation);
+      setNotice("由 Groq AI 翻译，请核对语义及多音字读音。");
+    } catch (cause) {
+      if (request.current === controller) setError(controller.signal.aborted ? "翻译请求超时，请重试。" : cause instanceof Error ? cause.message : "无法连接翻译服务。");
+    } finally {
+      window.clearTimeout(timeout);
+      if (request.current === controller) { request.current = null; setLoading(false); }
+    }
   }
 
   async function paste() {
@@ -60,11 +92,12 @@ export default function CantoneseApp() {
       <main>
         <section className="intro"><div className="eyebrow"><span /> 你的日常粤语学习伙伴</div><h1>让每一句，<span>都有粤味。</span></h1><p>从一句问候开始，轻松翻译、听懂粤语，慢慢讲出自己的故事。</p></section>
         <div className="workspace-heading"><div className="tabs" role="tablist" aria-label="学习方式">
-          <button id="text-tab" role="tab" aria-selected={tab === "text"} aria-controls="text-panel" onClick={() => setTab("text")}><Languages size={18} />文本翻译</button>
-          <button id="voice-tab" role="tab" aria-selected={tab === "voice"} aria-controls="voice-panel" onClick={() => setTab("voice")}><Mic size={18} />语音转译<span className="soon">即将开放</span></button>
-        </div><span className="demo-badge"><span /> 本地例句演示</span></div>
+          <button id="text-tab" role="tab" aria-selected={tab === "text"} aria-controls="text-panel" onClick={() => { cancelRequest(); setTab("text"); }}><Languages size={18} />文本翻译</button>
+          <button id="voice-tab" role="tab" aria-selected={tab === "voice"} aria-controls="voice-panel" onClick={() => { cancelRequest(); setTab("voice"); }}><Mic size={18} />语音转译</button>
+        </div>{tab === "text" ? <label className="translation-mode">翻译方式<select aria-label="翻译方式" value={mode} onChange={event => { cancelRequest(); setMode(event.target.value as "demo" | "api"); setResult(""); setError(""); setNotice(""); }}><option value="demo">本地例句演示</option><option value="api">Groq AI 翻译</option></select></label> : <span className="demo-badge">Groq 语音识别与翻译</span>}</div>
 
         {tab === "text" ? <section id="text-panel" role="tabpanel" aria-labelledby="text-tab">
+          <p className="mode-notice">{mode === "api" ? "API 模式：点击翻译会将输入文本发送至 Groq。需先在服务器配置密钥；免费额度以你的账户为准。" : "演示模式仅支持下方例句及其组合；任意文本请切换 Groq AI 翻译并配置密钥。"}</p>
           <div className="translation-card">
             <div className="language-row"><div><span className="language-tag">{direction === "mandarin-cantonese" ? "普" : "粤"}</span><strong>{source}</strong><span className="muted">源语言</span></div>
               <button className="swap" aria-label="交换翻译方向" onClick={() => { setDirection(direction === "mandarin-cantonese" ? "cantonese-mandarin" : "mandarin-cantonese"); edit(result ? displayResult : ""); }}><ArrowDownUp size={18} /></button>
@@ -74,14 +107,14 @@ export default function CantoneseApp() {
               <div className="panel-toolbar"><div className="flex gap-4"><button className="text-action" onClick={paste}><Clipboard size={15} />粘贴</button><button className="text-action" disabled={!input} onClick={() => edit("")}><Trash2 size={15} />清空</button></div><span className={characterCount > MAX_LENGTH ? "count-over" : "muted"}>{characterCount} / {MAX_LENGTH}</span></div></div>
               <div className="output-panel"><div className="output-content" aria-live="polite">{result ? <div className="translated-text">{direction === "mandarin-cantonese" ? <JyutpingText key={displayResult} text={displayResult} /> : <p lang="zh-CN">{displayResult}</p>}</div> : <div className="empty-output"><span><Sparkles size={25} strokeWidth={1.4} /></span><p>换一种表达，一样的心意</p><small>翻译结果将在这里显示</small></div>}</div>
                 <div className="panel-toolbar"><span className="muted">{direction === "mandarin-cantonese" ? "粤语发音见译文上方" : "粤语发音见输入学习区"}</span><div className="flex gap-4"><button className="text-action" disabled={!result} onClick={() => setOutputScript((outputScript ?? resolved) === "traditional" ? "simplified" : "traditional")} aria-label="切换输出简繁体">简 / 繁</button><button className="icon-action" aria-label="复制译文" disabled={!result} onClick={copy}><Copy size={16} /></button></div></div></div></div>
-            <div className="card-bottom"><span><BookOpen size={15} />粤拼已开启 · 点击汉字查看读音</span><button className="primary" disabled={!input.trim() || characterCount > MAX_LENGTH} onClick={translate}>翻译一下<ArrowRight size={17} /></button></div>
+            <div className="card-bottom"><span><BookOpen size={15} />粤拼已开启 · 点击汉字查看读音</span><button className="primary" disabled={loading || !input.trim() || characterCount > MAX_LENGTH} onClick={translate}>{loading ? "翻译中…" : "翻译一下"}<ArrowRight size={17} /></button></div>
           </div>
           <div role="alert" className={error ? "feedback error" : "sr-only"}>{error}</div><div role="status" className={notice ? "feedback success" : "sr-only"}>{notice}</div>
           <section className="examples"><div className="section-label"><Sparkles size={16} /><h2>不如，由呢句开始</h2><span>试试这些日常表达</span></div><div className="example-grid">{examples.map((example, index) => <button className="example" key={example.label} onClick={() => edit(convertScript(direction === "mandarin-cantonese" ? example.mandarin : example.cantonese, resolved))}><span className="example-top"><span>0{index + 1} <b>{example.label}</b></span><ChevronRight size={16} /></span><span className="example-text">{convertScript(direction === "mandarin-cantonese" ? example.mandarin : example.cantonese, resolved)}</span></button>)}</div></section>
-        </section> : <section className="voice-panel" id="voice-panel" role="tabpanel" aria-labelledby="voice-tab"><span className="voice-icon"><AudioLines size={38} /></span><span className="eyebrow">听见粤语，读懂心意</span><h2>把你听到的，变成看得懂的。</h2><p>录音、音频上传和粤语语音转写将在 Step 5 接入。</p><button className="primary" disabled><Mic size={18} />录音功能开发中</button><small>支持格式规划：MP3 · WAV · M4A</small><div className="voice-results"><div><strong>粤语转写</strong><p>接入语音识别后，将在这里展示粤语文本与粤拼。</p></div><div><strong>普通话翻译</strong><p>转写完成后，同步展示普通话翻译。</p></div></div></section>}
+        </section> : <section id="voice-panel" role="tabpanel" aria-labelledby="voice-tab"><VoiceRecorder script={script} /></section>}
 
         <aside className="learning-note"><span className="note-icon">粵</span><div><strong>慢慢嚟，比较快。</strong><p>学语言不用急，每天多讲一句，就离地道粤语近一步。</p></div><span className="note-decoration" aria-hidden="true">慢慢嚟</span></aside>
-        <footer><span>粤语通 <span className="footer-divider">/</span> 连接语言，也连接生活。</span><span><Check size={13} /> 浏览器语音朗读 · Step 4</span></footer>
+        <footer><span>粤语通 <span className="footer-divider">/</span> 连接语言，也连接生活。</span><span><Check size={13} /> 粤拼 · 粤语朗读 · AI 翻译接入</span></footer>
       </main>
     </div>
   );
