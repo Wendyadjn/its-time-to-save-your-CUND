@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "粤语通 · CantoneseMaster",
-  description: "粤普双向翻译与粤语学习工具 · Step 1–2 演示",
+  title: "敢学粤语 · Olivia Cantorigo",
+  description: "粤普双向翻译、粤拼学习与语音转译工具",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

@@ -1,5 +1,5 @@
-import CantoneseApp from "@/components/cantonese-app";
+import NotebookApp from "@/components/notebook-app";
 
 export default function Page() {
-  return <CantoneseApp />;
+  return <NotebookApp />;
 }

@@ -60,10 +60,20 @@ test("Ondoku 依实际播放高亮，复用缓存，停止忽略旧请求", asyn
   const active: (number|null)[] = [];
   const errors: string[] = [];
   const tick = () => new Promise(resolve => setTimeout(resolve, 0));
+  player.setRate(1.25);
+  assert.throws(() => player.setRate(3), RangeError);
   const play = player.play(["测试甲", "测试乙"], i => active.push(i), e => errors.push(e));
-  await tick(); assert.ok(active.every(value => value === null));
+  await tick(); assert.equal(audios[0].playbackRate, 1.25);
+  assert.equal(audios[0].preservesPitch, true);
+  audios[0].playbackRate = 1;
+  audios[0].onloadedmetadata?.(new Event("loadedmetadata"));
+  assert.equal(audios[0].playbackRate, 1.25);
+  player.setRate(2); assert.equal(audios[0].playbackRate, 2);
+  assert.equal(audios[0].defaultPlaybackRate, 2);
+  assert.ok(active.every(value => value === null));
   audios[0].onplaying?.(new Event("playing")); assert.equal(active.at(-1), 0);
   audios[0].onended?.(new Event("ended")); await tick();
+  assert.equal(audios[1].playbackRate, 2);
   audios[1].onplaying?.(new Event("playing")); assert.equal(active.at(-1), 1);
   audios[1].onended?.(new Event("ended")); await play;
   assert.equal(active.at(-1), null); assert.equal(calls, 2);
@@ -74,7 +84,7 @@ test("Ondoku 依实际播放高亮，复用缓存，停止忽略旧请求", asyn
   const before = audios.length;
   const pending = stale.play(["测试丙"], () => {}, e => errors.push(e));
   stale.stop(); finish(Response.json({ url: "https://storage.googleapis.com/ondoku3/voice/old.mp3" })); await pending;
-  assert.equal(audios.length, before); assert.equal(errors.length, 0);
+  assert.equal(audios.length, before + 1); assert.ok(!audios.at(-1)!.src.includes("old.mp3")); assert.equal(errors.length, 0);
   const broken = player.play(["测试甲"], () => {}, e => errors.push(e));
   await tick(); audios.at(-1)!.onerror?.(new Event("error")); await broken;
   assert.match(errors[0], /加载失败/);
@@ -90,9 +100,28 @@ test("默认请求保持浏览器 fetch 的全局调用上下文", async t => {
   });
   try {
     const errors: string[] = [];
-    const player = new OndokuSpeech(() => { throw new Error("失败请求不应创建音频"); });
+    const player = new OndokuSpeech(() => ({ src: "", play: async () => {}, pause() {}, load() {}, removeAttribute() {} }) as unknown as HTMLAudioElement);
     await player.play(["默认请求上下文回归测试"], () => {}, message => errors.push(message));
     assert.equal(called, true);
     assert.deepEqual(errors, ["测试额度提示"]);
   } finally { mock.mock.restore(); }
+});
+
+
+test("单字先解锁音频，再等待网络，复听直接播放缓存", async () => {
+  const order: string[] = [];
+  const audios: HTMLAudioElement[] = [];
+  const player = new OndokuSpeech(() => {
+    const audio = { src: "", pause() {}, load() {}, removeAttribute() {}, play: async () => { order.push(audio.src.startsWith("data:") ? "unlock" : "speech"); } } as unknown as HTMLAudioElement;
+    audios.push(audio); return audio;
+  }, async () => { order.push("request"); return Response.json({url: "https://storage.googleapis.com/ondoku3/media/character.mp3"}); });
+  const errors: string[] = [];
+  const task = player.play(["今"], () => {}, e => errors.push(e));
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.deepEqual(order, ["unlock", "request", "speech"]);
+  audios[0].onended?.(new Event("ended")); await task;
+  const replay = player.play(["今"], () => {}, e => errors.push(e));
+  assert.deepEqual(order, ["unlock", "request", "speech", "speech"]);
+  audios[1].onended?.(new Event("ended")); await replay;
+  assert.equal(errors.length, 0);
 });

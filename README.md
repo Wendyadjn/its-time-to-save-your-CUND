@@ -1,6 +1,8 @@
-# 粤语通 CantoneseMaster · v1.0
+# 敢学粤语 Olivia Cantorigo · v1.1
 
-粤语学习与翻译网页：粤普双向翻译、简繁转换、逐字粤拼、Ondoku HiuGaai 朗读，以及录音 / 上传转写和普通话翻译。
+感谢语音，敢学粤语。
+
+粤语学习网页：粤普双向翻译、简繁转换、逐字粤拼、Ondoku HiuGaai 朗读，以及录音 / 上传转写和普通话翻译。
 
 基于 Next.js App Router、React、TypeScript、Tailwind CSS 4 和 Lucide，支持桌面双栏与移动端上下布局。
 
@@ -49,7 +51,7 @@ npm run dev
 
 ### Ondoku HiuGaai 朗读
 
-- 当前声线固定为 `zh-HK-HiuGaaiNeural`，语速 0.9。
+- 当前声线固定为 `zh-HK-HiuGaaiNeural`，合成语速 0.9；播放器提供 x1、x1.25、x1.5、x2，播放中可调整，倍速变化不重新生成音频、不额外消耗生成字数。
 - 支持播放全文、句首喇叭 / 句子空白处播放单句、点击汉字播放单字，以及停止播放。
 - 全文按句依次生成、播放；高亮根据实际播放事件更新，首次生成和句间可能需要等待。
 - 当前页面复用最近 100 条文字对应的音频地址，刷新后清除，不持久化音频文件；地址失效时需重新生成。
@@ -93,12 +95,14 @@ npm run dev
 src/app/
   layout.tsx                  # 元信息、全局样式入口
   page.tsx                    # 单页 Dashboard
-  globals.css                 # 响应式布局、粤拼、播放高亮与弹窗
+  globals.css                 # 共享样式、粤拼、播放高亮与弹窗
+  design-lab/                 # 三套设计预览与手账主题样式
   api/translate/route.ts      # Groq 翻译代理
   api/transcribe/route.ts     # 音频校验与 Whisper 代理
   api/tts/route.ts            # Ondoku 代理与音频响应校验
 src/components/
-  cantonese-app.tsx           # Tabs、输入输出、翻译方向与简繁偏好
+  notebook-app.tsx            # 正式手账界面及设计方案预览
+  cantonese-app.tsx           # 保留的 v1.0 原版界面
   jyutping-text.tsx           # Ruby 注音、字卡、朗读与高亮
   voice-recorder.tsx          # 录音、试听、上传、编辑与重新翻译
 src/lib/
@@ -141,3 +145,9 @@ npm start
 - [Groq 额度与限速](https://console.groq.com/docs/rate-limits)
 - [Ondoku API 文档](https://ondoku3.com/en/developer/api/standard-tts.html)
 - [Ondoku 声线列表](https://ondoku3.com/en/developer/api/voices.html)
+
+## v1.1
+
+正式首页采用“口语手账”：几何扇形装饰背景、便签卡片、统一宋体阅读区、分区播放栏和逐句粤拼卡。品牌更新为“敢学粤语 / Olivia Cantorigo”，简繁默认自动；新增 x1、x1.25、x1.5、x2 播放倍速，以及音频加载时倍速恢复和单字播放解锁修复。保留粤普双向 Groq 翻译、粘贴/清空/复制、独立输出简繁切换与录音转译。
+
+`/design-lab` 保留三套交互式设计预览，翻译只使用本地例句；正式首页可切换 Groq AI 翻译。`v1.0` 标签保留原版快照。

@@ -8,7 +8,7 @@ import { convertScript, examples, MAX_LENGTH, resolveScript, translateDemo, type
 
 export default function CantoneseApp() {
   const [tab, setTab] = useState<"text" | "voice">("text");
-  const [script, setScript] = useState<Script>("simplified");
+  const [script, setScript] = useState<Script>("auto");
   const [direction, setDirection] = useState<Direction>("mandarin-cantonese");
   const [input, setInput] = useState<string>(examples[3].mandarin);
   const [result, setResult] = useState("");
@@ -83,14 +83,14 @@ export default function CantoneseApp() {
   return (
     <div className="app-shell">
       <header className="site-header">
-        <a className="brand" href="/" aria-label="粤语通首页"><span className="logo">粵<span>◡</span></span><span><strong>粤语通<span className="brand-dot">.</span></strong><small>CANTONESE MASTER</small></span></a>
-        <div className="header-right"><span className="header-note">用粤语，拉近一点距离</span><div className="script-switch" role="group" aria-label="全局简繁偏好">
+        <a className="brand" href="/" aria-label="敢学粤语首页"><span className="logo">粵<span>◡</span></span><span><strong>敢学粤语<span className="brand-dot">.</span></strong><small>Olivia Cantorigo</small></span></a>
+        <div className="header-right"><div className="script-switch" role="group" aria-label="全局简繁偏好">
           {([['simplified', '简'], ['traditional', '繁'], ['auto', '自动']] as const).map(([value, label]) => <button key={value} onClick={() => chooseScript(value)} aria-pressed={script === value}>{label}</button>)}
         </div></div>
       </header>
 
       <main>
-        <section className="intro"><div className="eyebrow"><span /> 你的日常粤语学习伙伴</div><h1>让每一句，<span>都有粤味。</span></h1><p>从一句问候开始，轻松翻译、听懂粤语，慢慢讲出自己的故事。</p></section>
+        <section className="intro"><div className="eyebrow"><span /> 你的日常粤语学习伙伴</div><h1>感谢语音，<span>敢学粤语</span></h1></section>
         <div className="workspace-heading"><div className="tabs" role="tablist" aria-label="学习方式">
           <button id="text-tab" role="tab" aria-selected={tab === "text"} aria-controls="text-panel" onClick={() => { cancelRequest(); setTab("text"); }}><Languages size={18} />文本翻译</button>
           <button id="voice-tab" role="tab" aria-selected={tab === "voice"} aria-controls="voice-panel" onClick={() => { cancelRequest(); setTab("voice"); }}><Mic size={18} />语音转译</button>
@@ -114,7 +114,7 @@ export default function CantoneseApp() {
         </section> : <section id="voice-panel" role="tabpanel" aria-labelledby="voice-tab"><VoiceRecorder script={script} /></section>}
 
         <aside className="learning-note"><span className="note-icon">粵</span><div><strong>慢慢嚟，比较快。</strong><p>学语言不用急，每天多讲一句，就离地道粤语近一步。</p></div><span className="note-decoration" aria-hidden="true">慢慢嚟</span></aside>
-        <footer><span>粤语通 <span className="footer-divider">/</span> 连接语言，也连接生活。</span><span><Check size={13} /> 粤拼 · 粤语朗读 · AI 翻译接入</span></footer>
+        <footer><span><Check size={13} /> 粤拼 · 粤语朗读 · AI 翻译接入</span></footer>
       </main>
     </div>
   );

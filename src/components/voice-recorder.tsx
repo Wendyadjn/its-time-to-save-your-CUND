@@ -147,7 +147,7 @@ export default function VoiceRecorder({ script }: { script: Script }) {
   return <div className="voice-workspace">
     <div className="voice-panel">
       <span className={`voice-icon ${status === "recording" ? "is-recording" : ""}`}><AudioLines size={38} /></span>
-      <span className="eyebrow">听见粤语，读懂心意</span><h2>把你听到的，变成看得懂的。</h2>
+      <h2>感谢语音，更需要眼</h2>
       <p>点击录音或上传文件，停止录音后可先试听，再开始转写。</p>
       <div className="record-controls">
         {status === "recording" ? <button className="primary" onClick={() => { if (recorder.current?.state === "recording") recorder.current.stop(); releaseMicrophone(); }}><Square size={17} />停止录音 · {seconds}s</button>

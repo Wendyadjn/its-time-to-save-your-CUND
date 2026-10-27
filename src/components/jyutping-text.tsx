@@ -16,6 +16,7 @@ export default function JyutpingText({ text }: { text: string }) {
   const playback = useRef(0);
   const [active, setActive] = useState<number | null>(null);
   const [playing, setPlaying] = useState(false);
+  const [rate, setRate] = useState(1);
   const [speechError, setSpeechError] = useState("");
   useEffect(() => {
     const controller = new OndokuSpeech();
@@ -38,9 +39,10 @@ export default function JyutpingText({ text }: { text: string }) {
     });
   }
 
+  const speedControl = <label className="speech-speed">倍速<select aria-label="粤语播放倍速" value={rate} onChange={event => { const value = Number(event.target.value); player.current?.setRate(value); setRate(value); }}>{[1, 1.25, 1.5, 2].map(value => <option key={value} value={value}>x{value}</option>)}</select></label>;
+
   return <div className="jyutping-learning" lang="zh-HK">
-    <div className="speech-toolbar"><button className="text-action" onClick={() => speak(sentences.map(sentence => sentence.text))}><Volume2 size={16} />播放全文</button><button className="text-action" disabled={!playing} onClick={stop}><Square size={14} />停止</button><small>粤语 · HiuGaai · <a href="https://ondoku3.com/zh-hans/" target="_blank" rel="noreferrer">语音由 Ondoku 提供</a></small></div>
-    <small className="speech-status">点击播放会将朗读文字发送至 Ondoku，生成音频使用账户字数额度；服务会保留生成历史。</small>
+    <div className="speech-toolbar"><button className="text-action" onClick={() => speak(sentences.map(sentence => sentence.text))}><Volume2 size={16} />播放全文</button><button className="text-action" disabled={!playing} onClick={stop}><Square size={14} />停止</button>{speedControl}<small>粤语 · HiuGaai · <a href="https://ondoku3.com/zh-hans/" target="_blank" rel="noreferrer">语音由 Ondoku 提供</a></small></div>
     <p className="jyutping-text" aria-label="粤语文本与粤拼">
       {sentences.map((sentence, sentenceIndex) => <span key={sentenceIndex} className={active === sentenceIndex ? "speech-sentence is-speaking" : "speech-sentence"} onClick={() => speak([sentence.text], sentenceIndex)}>
       <button className="sentence-play" aria-label={`朗读第 ${sentenceIndex + 1} 句`} onClick={event => { event.stopPropagation(); speak([sentence.text], sentenceIndex); }}><Volume2 size={13} /></button>
@@ -54,13 +56,15 @@ export default function JyutpingText({ text }: { text: string }) {
       ><ruby>{token.character}<rp>（</rp><rt>{token.jyutping ?? "—"}</rt><rp>）</rp></ruby></button> : <span key={index}>{token.character}</span>)}
       </span>)}
     </p>
-    <p role="status" className="speech-status">{speechError || (playing && active === null ? "正在准备 Ondoku 音频…" : active !== null ? `正在朗读第 ${active + 1} 句` : "点击句首喇叭或句子空白处朗读整句；点击汉字查看并朗读单字。")}</p>
+    <details className="speech-privacy"><summary>语音服务与额度说明</summary><p>播放文字会发送至 Ondoku，生成音频使用账户字数额度，服务会保留生成历史。</p></details>
+    <p role="status" className="speech-status">{speechError || (playing && active === null ? "正在准备 Ondoku 音频…" : active !== null ? `正在朗读第 ${active + 1} 句` : "句首按钮播放整句，点击汉字查看读音。")}</p>
     <dialog ref={dialog} className="character-dialog" onCancel={stop} aria-labelledby={titleId}>
       <form method="dialog" onSubmit={stop}><button className="dialog-close" aria-label="关闭读音详情">×</button></form>
       <h3 id={titleId}>{selected?.character}</h3>
       <p>粤拼 <strong>{selected?.jyutping ?? "词库暂未收录"}</strong></p>
       <small>数字 1–6 表示粤语声调。自动注音请结合上下文核对。</small>
       <button className="primary" disabled={!selected?.jyutping} onClick={() => selected && speak([selected.character])}><Volume2 size={16} />再听一次</button>
+      {speedControl}
       <p role="status" className="speech-status">{speechError || (playing ? "正在准备或播放单字" : "")}</p>
       <p className="character-next">普通话拼音与释义将在后续阶段接入。单字声调可能与句中读音不同。</p>
     </dialog>
