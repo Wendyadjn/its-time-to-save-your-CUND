@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import JyutpingText from "@/components/jyutping-text";
-import { ArrowDownUp, ArrowRight, AudioLines, BookOpen, Check, ChevronRight, Clipboard, Copy, Languages, Mic, Sparkles, Trash2, Volume2 } from "lucide-react";
+import { ArrowDownUp, ArrowRight, AudioLines, BookOpen, Check, ChevronRight, Clipboard, Copy, Languages, Mic, Sparkles, Trash2 } from "lucide-react";
 import { convertScript, examples, MAX_LENGTH, resolveScript, translateDemo, type Direction, type Script } from "@/lib/translation";
 
 export default function CantoneseApp() {
@@ -73,7 +73,7 @@ export default function CantoneseApp() {
               {direction === "cantonese-mandarin" && input.trim() && characterCount <= MAX_LENGTH && <section className="source-annotation" aria-label="输入粤语的粤拼标注"><span className="annotation-label">粤拼学习 · 点击汉字查看读音</span><JyutpingText key={input} text={input} /></section>}
               <div className="panel-toolbar"><div className="flex gap-4"><button className="text-action" onClick={paste}><Clipboard size={15} />粘贴</button><button className="text-action" disabled={!input} onClick={() => edit("")}><Trash2 size={15} />清空</button></div><span className={characterCount > MAX_LENGTH ? "count-over" : "muted"}>{characterCount} / {MAX_LENGTH}</span></div></div>
               <div className="output-panel"><div className="output-content" aria-live="polite">{result ? <div className="translated-text">{direction === "mandarin-cantonese" ? <JyutpingText key={displayResult} text={displayResult} /> : <p lang="zh-CN">{displayResult}</p>}</div> : <div className="empty-output"><span><Sparkles size={25} strokeWidth={1.4} /></span><p>换一种表达，一样的心意</p><small>翻译结果将在这里显示</small></div>}</div>
-                <div className="panel-toolbar"><button className="text-action" disabled title="Step 4 开放全文发音"><Volume2 size={16} />播放全文<small>稍后开放</small></button><div className="flex gap-4"><button className="text-action" disabled={!result} onClick={() => setOutputScript((outputScript ?? resolved) === "traditional" ? "simplified" : "traditional")} aria-label="切换输出简繁体">简 / 繁</button><button className="icon-action" aria-label="复制译文" disabled={!result} onClick={copy}><Copy size={16} /></button></div></div></div></div>
+                <div className="panel-toolbar"><span className="muted">{direction === "mandarin-cantonese" ? "粤语发音见译文上方" : "粤语发音见输入学习区"}</span><div className="flex gap-4"><button className="text-action" disabled={!result} onClick={() => setOutputScript((outputScript ?? resolved) === "traditional" ? "simplified" : "traditional")} aria-label="切换输出简繁体">简 / 繁</button><button className="icon-action" aria-label="复制译文" disabled={!result} onClick={copy}><Copy size={16} /></button></div></div></div></div>
             <div className="card-bottom"><span><BookOpen size={15} />粤拼已开启 · 点击汉字查看读音</span><button className="primary" disabled={!input.trim() || characterCount > MAX_LENGTH} onClick={translate}>翻译一下<ArrowRight size={17} /></button></div>
           </div>
           <div role="alert" className={error ? "feedback error" : "sr-only"}>{error}</div><div role="status" className={notice ? "feedback success" : "sr-only"}>{notice}</div>
@@ -81,7 +81,7 @@ export default function CantoneseApp() {
         </section> : <section className="voice-panel" id="voice-panel" role="tabpanel" aria-labelledby="voice-tab"><span className="voice-icon"><AudioLines size={38} /></span><span className="eyebrow">听见粤语，读懂心意</span><h2>把你听到的，变成看得懂的。</h2><p>录音、音频上传和粤语语音转写将在 Step 5 接入。</p><button className="primary" disabled><Mic size={18} />录音功能开发中</button><small>支持格式规划：MP3 · WAV · M4A</small><div className="voice-results"><div><strong>粤语转写</strong><p>接入语音识别后，将在这里展示粤语文本与粤拼。</p></div><div><strong>普通话翻译</strong><p>转写完成后，同步展示普通话翻译。</p></div></div></section>}
 
         <aside className="learning-note"><span className="note-icon">粵</span><div><strong>慢慢嚟，比较快。</strong><p>学语言不用急，每天多讲一句，就离地道粤语近一步。</p></div><span className="note-decoration" aria-hidden="true">慢慢嚟</span></aside>
-        <footer><span>粤语通 <span className="footer-divider">/</span> 连接语言，也连接生活。</span><span><Check size={13} /> 本轮文本仅在浏览器内处理 · Step 3</span></footer>
+        <footer><span>粤语通 <span className="footer-divider">/</span> 连接语言，也连接生活。</span><span><Check size={13} /> 浏览器语音朗读 · Step 4</span></footer>
       </main>
     </div>
   );
