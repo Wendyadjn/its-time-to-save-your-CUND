@@ -1,6 +1,6 @@
 # 粤语通 CantoneseMaster · v1.0
 
-粤语学习与翻译网页：粤普双向翻译、简繁转换、逐字粤拼、Ondoku HiuGaai 朗读，以及录音 / 上传转写和普通话翻译。
+粤语学习网页：粤普双向翻译、简繁转换、逐字粤拼、Ondoku HiuGaai 朗读，以及录音 / 上传转写和普通话翻译。
 
 基于 Next.js App Router、React、TypeScript、Tailwind CSS 4 和 Lucide，支持桌面双栏与移动端上下布局。
 
