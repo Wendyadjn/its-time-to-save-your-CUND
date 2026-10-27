@@ -1,6 +1,6 @@
 # 粤语通 CantoneseMaster
 
-Step 1–2 完整本地实现。Next.js App Router + React + TypeScript + Tailwind CSS 4 + Lucide。
+Step 1–3 完整本地实现。Next.js App Router + React + TypeScript + Tailwind CSS 4 + Lucide。
 
 ## 启动
 
@@ -42,11 +42,9 @@ cantonese-master/
 └── .gitignore
 ```
 
-后续只在功能实际实现时增加以下模块，不创建空文件：
+Step 3 已新增 `src/components/jyutping-text.tsx`、`src/lib/jyutping.ts` 和 `tests/jyutping.test.ts`。后续规划：
 
 ```text
-src/components/jyutping-text.tsx     # Step 3：Ruby 标注、字词 Popover
-src/lib/jyutping.ts                 # Step 3：粤拼转换与分词
 src/lib/speech.ts                   # Step 4：全文、句子、单字 TTS
 src/components/voice-recorder.tsx   # Step 5：录音、上传与转写状态
 src/app/api/translate/route.ts      # 正式翻译服务代理，密钥留在服务器
@@ -64,7 +62,7 @@ npm install next react react-dom lucide-react opencc-js@1.4.2
 npm install -D typescript @types/node @types/react @types/react-dom tailwindcss@4 @tailwindcss/postcss@4 tsx
 ```
 
-首次安装后用 lockfile 锁定实际版本。后续复现用 `npm ci`。本轮无需 Zustand、粤拼包或语音 SDK；状态使用 React Hooks。
+首次安装后用 lockfile 锁定实际版本。后续复现用 `npm ci`。Step 3 新增 `to-jyutping@3.1.1`；无需 Zustand 或语音 SDK，状态使用 React Hooks。
 
 构建脚本使用 Next.js 内置 Webpack，绕开本机 Turbopack CSS 编译时的端口权限限制。
 
@@ -90,11 +88,13 @@ npm install -D typescript @types/node @types/react @types/react-dom tailwindcss@
 
 ## 后续接入
 
-Step 3：用实际粤拼库替换文本渲染，保留标点和多音字语境；切勿用固定例句粤拼冒充通用注音。
+Step 3 已完成：使用 [to-jyutping](https://github.com/CanCLID/to-jyutping) 对全文一次注音，再逐字用 Ruby 标签对齐渲染。输入粤语时，输入框下方即时显示学习区（上限 3000 字）；输出粤语时，译文直接展示粤拼。简繁字形、标点、换行、英文和 emoji 均保留。未收录汉字显示 `—`，点击后说明词库未收录，不编造读音。
+
+点字后打开原生 dialog 读音卡片，支持键盘 Enter / Space 打开、Esc 或关闭按钮关闭，并由浏览器管理焦点。字卡当前展示粤拼与声调说明；普通话拼音、释义及发音尚未接入。自动注音可能误判多音字，应结合语境校读。
 
 Step 4：检测 `speechSynthesis` 和粤语 voice；没有 `zh-HK` / 粤语声线时提示用户，不默默使用普通话。长段落需分句播放并维护播放取消与高亮状态。
 
 Step 5：实现真实录音或语音识别能力检测、录音资源释放、音频类型/大小限制及 STT 服务；浏览器识别支持程度不同。调用正式翻译或 STT 服务时，经服务器路由读取环境变量，禁止将 API 密钥放到客户端。
 
-当前不提供粤拼、点字释义、发音、录音、上传或任意文本真实翻译。这些是 Step 3–5 或生产服务接入范围，页面已明确说明。
+当前不提供点字释义、普通话拼音、发音、录音、上传或任意文本真实翻译。这些属于后续阶段或生产服务接入范围，页面已明确说明。
 本次只交付本地源码，未注册或发布托管站点。

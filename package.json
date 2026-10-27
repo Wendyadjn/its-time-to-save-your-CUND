@@ -10,19 +10,20 @@
     "test": "tsx --test tests/*.test.ts"
   },
   "dependencies": {
+    "lucide-react": "latest",
     "next": "latest",
+    "opencc-js": "1.4.2",
     "react": "latest",
     "react-dom": "latest",
-    "lucide-react": "latest",
-    "opencc-js": "1.4.2"
+    "to-jyutping": "^3.1.1"
   },
   "devDependencies": {
-    "typescript": "latest",
+    "@tailwindcss/postcss": "^4",
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "tailwindcss": "^4",
-    "@tailwindcss/postcss": "^4",
-    "tsx": "latest"
+    "tsx": "latest",
+    "typescript": "latest"
   }
 }
