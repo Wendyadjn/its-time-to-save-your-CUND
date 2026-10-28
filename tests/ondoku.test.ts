@@ -14,7 +14,7 @@ test("Ondoku 路由校验、固定声线、额度提示与密钥保密", async t
     calls++;
     assert.equal(url, "https://ondoku3.com/text_to_speech_api/");
     assert.equal((options.headers as Record<string,string>).token, token);
-    assert.deepEqual(JSON.parse(options.body as string), { voice: "zh-HK-HiuGaaiNeural", text: expectedText, speed: 0.9, pitch: 0 });
+    assert.deepEqual(JSON.parse(options.body as string), { voice: "zh-HK-HiuGaaiNeural", text: expectedText, speed: 1, pitch: 0 });
     return Response.json(payload, { status });
   });
   const req = (text: unknown = "你好", origin = "http://localhost") => new Request("http://localhost/api/tts", { method: "POST", headers: { "Content-Type": "application/json", origin }, body: JSON.stringify({ text }) });

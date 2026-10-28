@@ -46,7 +46,7 @@ export async function POST(request: Request) {
   try {
     const response = await fetch("https://ondoku3.com/text_to_speech_api/", {
       method: "POST", headers: { "Content-Type": "application/json", token },
-      body: JSON.stringify({ voice: "zh-HK-HiuGaaiNeural", text, speed: 0.9, pitch: 0 }),
+      body: JSON.stringify({ voice: "zh-HK-HiuGaaiNeural", text, speed: 1, pitch: 0 }),
       signal: AbortSignal.any([request.signal, AbortSignal.timeout(60000)]), cache: "no-store",
     });
     if (!response.ok) return failure(response.status === 429 ? "Ondoku 请求达到上限，请稍后重试。" : "Ondoku 生成失败，请检查 Token、账户额度后重试。", response.status === 429 ? 429 : 502);

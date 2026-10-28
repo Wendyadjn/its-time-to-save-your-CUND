@@ -17,7 +17,7 @@ const concepts = [
 export default function NotebookApp({ preview = false }: { preview?: boolean }) {
   const [concept, setConcept] = useState(2);
   const [tab, setTab] = useState<"text" | "voice">("text");
-  const [script, setScript] = useState<Script>("auto");
+  const [script, setScript] = useState<Script>("simplified");
   const [reverse, setReverse] = useState(false);
   const [input, setInput] = useState<string>(examples[3].mandarin);
   const [result, setResult] = useState<string>(examples[3].cantonese);
@@ -81,12 +81,7 @@ export default function NotebookApp({ preview = false }: { preview?: boolean }) 
 
       <div className={styles.body}>
         <aside className={styles.rail}><span>OC / 01</span><div>听 · 读 · 讲</div><small>TEXT / AUDIO</small></aside>
-        <section className={styles.hero}>
-          <div className={styles.heroCopy}><span className={styles.kicker}>{concept === 0 ? "语言生活刊 / LANGUAGE & EVERYDAY" : concept === 1 ? "YOUR DAILY LISTENING SESSION" : "粤普翻译 / 粤拼 / 语音转写"}</span><h1>感谢语音，<br/><em>敢学粤语<span>。</span></em></h1></div>
-          <div className={styles.heroArt} aria-hidden="true">{concept === 0 ? <><span className={styles.issue}>VOL. 001<br/>日常口语特辑</span><strong>講</strong><span className={styles.artCaption}>文字 / 发音 / 粤拼</span></> : concept === 1 ? <><span className={styles.recordLabel}>CANTO / STEREO</span><div className={styles.disc}><span>粵</span></div><div className={styles.wave}>{[12,28,40,23,55,36,70,46,24,50,68,32,45,22,38,56,30,16].map((height,i) => <i key={i} style={{height}} />)}</div></> : <><span className={styles.sticker}>粵 / 普<br/>語音 · 文字</span><div className={styles.noteWord}><small>jam2 caa4</small><strong>飲茶</strong><span>一齐去，好唔好？</span></div><span className={styles.doodle}>jam2 / caa4</span></>}</div>
-        </section>
-
-        <nav className={styles.nav} aria-label="学习方式"><div><button aria-pressed={tab === "text"} onClick={() => { cancel(); setTab("text"); }}><Languages size={17}/><span>{concept === 1 ? "01 / TEXT TRACK" : "文本翻译"}</span></button><button aria-pressed={tab === "voice"} onClick={() => { cancel(); setTab("voice"); }}><Mic size={17}/><span>{concept === 1 ? "02 / VOICE TRACK" : "语音转译"}</span></button></div><span>{tab === "text" ? "双向翻译 · 简繁转换" : "感谢语音，更需要眼"}</span></nav>
+        <nav className={styles.nav} aria-label="学习方式"><div><button aria-pressed={tab === "text"} onClick={() => { cancel(); setTab("text"); }}><Languages size={17}/><span>{concept === 1 ? "01 / TEXT TRACK" : "文本翻译"}</span></button><button aria-pressed={tab === "voice"} onClick={() => { cancel(); setTab("voice"); }}><Mic size={17}/><span>{concept === 1 ? "02 / VOICE TRACK" : "语音转译"}</span></button></div><span>{tab === "text" ? "双向翻译 · 简繁转换" : "语音转译"}</span></nav>
 
         {!preview && tab === "text" && <div className={styles.modeBar}><label>翻译方式<select aria-label="翻译方式" value={mode} onChange={event => { cancel(); setMode(event.target.value as "demo" | "api"); setResult(""); setMessage(""); }}><option value="demo">本地例句演示</option><option value="api">Groq AI 翻译</option></select></label><small>{mode === "api" ? "翻译文字会发送至 Groq，使用账户额度。" : "演示支持下方例句及其组合；自由文本请选择 AI 翻译。"}</small></div>}
         <section className={styles.workspace} aria-label={tab === "text" ? "文本翻译" : "语音转译"}>

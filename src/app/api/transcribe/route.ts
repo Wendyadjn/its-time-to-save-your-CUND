@@ -1,4 +1,7 @@
+import { reviewTranscription } from "../../../lib/transcription";
 import { hasAudioSignature, MAX_AUDIO_BYTES, validateAudio } from "../../../lib/audio";
+
+import { validateAudioDuration } from "../../../lib/audio-duration";
 
 export const runtime = "nodejs";
 // shortcut: 单进程限流只适合本地试用，公开部署前需统一登录与持久化限流。
@@ -37,6 +40,8 @@ export async function POST(request: Request) {
     if (error) return failure(error, file.size > MAX_AUDIO_BYTES ? 413 : 400);
     if (!hasAudioSignature(new Uint8Array(await file.slice(0, 16).arrayBuffer()), file.name)) return failure("音频格式与文件扩展名不匹配，请上传有效音频。", 400);
   } catch { return failure("无法读取上传文件，请重新选择音频。", 400); }
+  const durationError = await validateAudioDuration(file);
+  if (durationError) return failure(durationError, 422);
   const key = process.env.GROQ_API_KEY?.trim();
   if (!key) return failure("请先在 .env.local 配置 GROQ_API_KEY 并重启服务。", 503);
   const now = Date.now();
@@ -46,10 +51,9 @@ export async function POST(request: Request) {
   const form = new FormData();
   form.set("file", file);
   form.set("model", "whisper-large-v3");
-  form.set("response_format", "json");
+  form.set("response_format", "verbose_json");
+  form.append("timestamp_granularities[]", "segment");
   form.set("temperature", "0");
-  // 不强制 zh，避免把粤语口语引导为普通话；提示只提供粤语字形风格。
-  form.set("prompt", "以下係粵語口語錄音：我哋、佢哋、嘅、咗、喺、唔、冇、咩、點樣。保留粵語原話。");
   try {
     const response = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
       method: "POST", headers: { Authorization: `Bearer ${key}` }, body: form,
@@ -57,14 +61,15 @@ export async function POST(request: Request) {
     });
     if (!response.ok) {
       if (response.status === 429) return failure("Groq 语音免费额度或速率达到上限，请稍后重试。", 429);
-      if ([401, 403].includes(response.status)) return failure("Groq 密钥或语音模型访问权限无效。", 502);
+      if (response.status === 401) return failure("Groq 密钥验证失败。请检查 .env.local 中的 GROQ_API_KEY；若已更新，请停止并重新启动开发服务。", 502);
+      if (response.status === 403) return failure("语音请求被拒绝。请检查开发服务的网络访问，以及 Groq 项目的 whisper-large-v3 模型权限；这不一定是密钥无效。", 502);
       if ([400, 413, 422].includes(response.status)) return failure("语音服务无法解析此音频，请换用有效的较短 MP3 或 WAV。", 422);
       return failure("语音服务暂不可用，请稍后重试。", 502);
     }
     const data = await response.json();
     if (typeof data?.text !== "string" || !data.text.trim()) return failure("未识别到语音，请检查音量或换一段清晰录音。", 422);
     if (Array.from(data.text).length > 20_000) return failure("转写结果过长，请分段上传音频。", 422);
-    return Response.json({ text: data.text.trim() }, { headers: { "Cache-Control": "no-store" } });
+    return Response.json({ text: data.text.trim(), segments: reviewTranscription(data) }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     if (error instanceof Error && ["AbortError", "TimeoutError"].includes(error.name)) return failure("语音转写超时或已取消，请缩短音频后重试。", 504);
     return failure("语音转写失败，请检查服务端网络后重试。", 502);

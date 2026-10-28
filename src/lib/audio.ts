@@ -1,5 +1,5 @@
 export const MAX_AUDIO_BYTES = 10 * 1024 * 1024;
-export const MAX_RECORD_SECONDS = 120;
+export const MAX_RECORD_SECONDS = 300;
 export const AUDIO_ACCEPT = ".mp3,.wav,.m4a,.webm,.ogg";
 
 export function validateAudio(file: Pick<File, "name" | "size" | "type">): string | null {
@@ -26,4 +26,13 @@ export function recordingExtension(mime: string): string {
   if (mime.includes("mp4")) return "m4a";
   if (mime.includes("ogg")) return "ogg";
   return "webm";
+}
+
+export function recordingReminder(elapsed: number): string {
+  const remaining = Math.max(0, MAX_RECORD_SECONDS - elapsed);
+  if (remaining === 0) return "已达五分钟，录音已自动停止。";
+  if (remaining <= 5) return `还剩 ${remaining} 秒，录音即将自动停止。`;
+  if (remaining <= 10) return "还剩 10 秒，录音即将自动停止。";
+  if (remaining <= 30) return "还剩 30 秒，录音即将自动停止。";
+  return "";
 }

@@ -1,9 +1,17 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { hasAudioSignature, MAX_AUDIO_BYTES, recordingExtension, validateAudio } from "../src/lib/audio";
+import { hasAudioSignature, MAX_AUDIO_BYTES, recordingExtension, recordingReminder, validateAudio } from "../src/lib/audio";
 import { POST } from "../src/app/api/transcribe/route";
 
-const wav = new TextEncoder().encode("RIFF0000WAVE0000");
+function makeWav(seconds = 1) {
+  const bytes = Buffer.alloc(44 + Math.round(seconds * 8000) * 2);
+  bytes.write("RIFF"); bytes.writeUInt32LE(bytes.length - 8, 4); bytes.write("WAVEfmt ", 8);
+  bytes.writeUInt32LE(16, 16); bytes.writeUInt16LE(1, 20); bytes.writeUInt16LE(1, 22);
+  bytes.writeUInt32LE(8000, 24); bytes.writeUInt32LE(16000, 28); bytes.writeUInt16LE(2, 32); bytes.writeUInt16LE(16, 34);
+  bytes.write("data", 36); bytes.writeUInt32LE(bytes.length - 44, 40);
+  return bytes;
+}
+const wav = makeWav();
 
 test("音频大小、格式与签名校验", () => {
   assert.equal(validateAudio({ name: "test.wav", type: "audio/wav", size: 16 }), null);
@@ -26,14 +34,20 @@ test("音频大小、格式与签名校验", () => {
 
 test("转写 API 校验与错误恢复，不调用真实 Groq", async t => {
   const previous = process.env.GROQ_API_KEY;
-  let result = Response.json({ text: "我哋今日去飲茶。" });
+  const segment = { text: "我哋今日去飲茶。", start: 0, end: 1, avg_logprob: -0.1, no_speech_prob: 0.01, compression_ratio: 1.2 };
+  let result = Response.json({ text: segment.text, segments: [segment] });
   let thrown: Error | null = null;
   let calls = 0;
+  let now = Date.now();
+  t.mock.method(Date, "now", () => now);
   t.mock.method(globalThis, "fetch", async (url: string, options: RequestInit) => {
     calls++;
     assert.equal(url, "https://api.groq.com/openai/v1/audio/transcriptions");
     assert.equal((options.body as FormData).get("model"), "whisper-large-v3");
     assert.equal((options.body as FormData).get("language"), null);
+    assert.equal((options.body as FormData).get("prompt"), null);
+    assert.equal((options.body as FormData).get("response_format"), "verbose_json");
+    assert.equal((options.body as FormData).get("timestamp_granularities[]"), "segment");
     assert.equal((options.headers as Record<string, string>).Authorization, "Bearer fake-test-key");
     if (thrown) throw thrown;
     return result;
@@ -51,16 +65,23 @@ test("转写 API 校验与错误恢复，不调用真实 Groq", async t => {
     assert.equal((await POST(request(new File(["not audio"], "fake.wav", { type: "audio/wav" })))).status, 400);
     assert.equal((await POST(request(new File([wav], "bad.exe")))).status, 400);
     assert.equal((await POST(new Request("http://localhost:3000/api/transcribe", { method: "POST", body: "text" }))).status, 415);
+    const tooLong = await POST(request(new File([makeWav(301)], "long.wav", { type: "audio/wav" })));
+    assert.equal(tooLong.status, 422);
+    assert.ok((await tooLong.text()).includes("五分钟"));
     assert.equal(calls, 0);
     process.env.GROQ_API_KEY = "fake-test-key";
     const success = await POST(request());
     assert.equal(success.status, 200);
-    assert.deepEqual(await success.json(), { text: "我哋今日去飲茶。" });
-    for (const status of [429, 401, 400]) {
+    assert.deepEqual(await success.json(), { text: segment.text, segments: [{ text: segment.text, start: 0, end: 1, issue: null }] });
+    now += 60_001;
+    for (const status of [429, 401, 403, 400]) {
       result = new Response("private provider error", { status });
       const response = await POST(request());
       assert.equal(response.status, status === 429 ? 429 : status === 400 ? 422 : 502);
-      assert.ok(!(await response.text()).includes("private provider error"));
+      const message = await response.text();
+      assert.ok(!message.includes("private provider error"));
+      if (status === 401) assert.ok(message.includes("重新启动"));
+      if (status === 403) assert.ok(message.includes("whisper-large-v3"));
     }
     result = Response.json({ text: " " });
     assert.equal((await POST(request())).status, 422);
@@ -73,4 +94,16 @@ test("转写 API 校验与错误恢复，不调用真实 Groq", async t => {
     if (previous === undefined) delete process.env.GROQ_API_KEY;
     else process.env.GROQ_API_KEY = previous;
   }
+});
+
+test("五分钟边界、无效音频和倒计时提醒", async () => {
+  const { validateAudioDuration } = await import("../src/lib/audio-duration");
+  assert.equal(await validateAudioDuration(new File([makeWav(300)], "limit.wav")), null);
+  assert.ok(await validateAudioDuration(new File([makeWav(300.1)], "long.wav")));
+  assert.ok(await validateAudioDuration(new File(["bad"], "broken.wav")));
+  assert.equal(recordingReminder(269), "");
+  assert.match(recordingReminder(270), /30 秒/);
+  assert.match(recordingReminder(290), /10 秒/);
+  assert.match(recordingReminder(295), /5 秒/);
+  assert.match(recordingReminder(300), /自动停止/);
 });
