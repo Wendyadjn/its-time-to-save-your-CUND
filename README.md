@@ -1,8 +1,8 @@
 # 敢学粤语 Olivia Cantorigo · v1.1
 
-感谢语音，敢学粤语。
+you seem pretty sad for someone so bad at cantonese
 
-粤语学习网页：粤普双向翻译、简繁转换、逐字粤拼、Ondoku HiuGaai 朗读，以及录音 / 上传转写和普通话翻译。
+粤语学习网页：该网页支持粤普双向翻译、逐字粤拼与发音、以及录音 / 上传转写和普通话翻译。语音朗读来自 Ondoku HiuGaai。
 
 基于 Next.js App Router、React、TypeScript、Tailwind CSS 4 和 Lucide，支持桌面双栏与移动端上下布局。
 
@@ -147,7 +147,5 @@ npm start
 - [Ondoku 声线列表](https://ondoku3.com/en/developer/api/voices.html)
 
 ## v1.1
+更改了UI，希望看起来比原本的好看了。但还是有点丑。
 
-正式首页采用“口语手账”：几何扇形装饰背景、便签卡片、统一宋体阅读区、分区播放栏和逐句粤拼卡。品牌更新为“敢学粤语 / Olivia Cantorigo”，简繁默认自动；新增 x1、x1.25、x1.5、x2 播放倍速，以及音频加载时倍速恢复和单字播放解锁修复。保留粤普双向 Groq 翻译、粘贴/清空/复制、独立输出简繁切换与录音转译。
-
-`/design-lab` 保留三套交互式设计预览，翻译只使用本地例句；正式首页可切换 Groq AI 翻译。`v1.0` 标签保留原版快照。
