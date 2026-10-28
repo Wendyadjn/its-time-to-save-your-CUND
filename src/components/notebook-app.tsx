@@ -11,7 +11,7 @@ import styles from "@/app/design-lab/design-lab.module.css";
 const concepts = [
   { id: "editorial", number: "01", name: "港式字报", english: "THE CANTO DAILY", description: "像翻开一份会说话的香港文化报。朱红、纸色、大字与细线，文字本身就是主角。", tags: "文化感 / 大字排版 / 编辑式布局" },
   { id: "studio", number: "02", name: "声音实验室", english: "CANTO SOUND STUDIO", description: "把语言学习变成一场声音采样。深色控制台、荧光提示与清晰音轨，适合专注听读。", tags: "声音感 / 深色控制台 / 高对比" },
-  { id: "notebook", number: "03", name: "口语手账", english: "A LITTLE CANTO CLUB", description: "几何装饰背景、便签卡片、统一宋体。译文、播放控制、逐句粤拼分区显示。", tags: "亲近感 / 便签字卡 / 轻松玩味" },
+  { id: "notebook", number: "03", name: "口语手账", english: "YOU SEEM PRETTY SAD FOR SOMEONE SO BAD AT CANTONESE LEARNING", description: "几何装饰背景、便签卡片、统一宋体。译文、播放控制、逐句粤拼分区显示。", tags: "亲近感 / 便签字卡 / 轻松玩味" },
 ] as const;
 
 export default function NotebookApp({ preview = false }: { preview?: boolean }) {
