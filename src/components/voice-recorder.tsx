@@ -6,14 +6,16 @@ import JyutpingText from "./jyutping-text";
 import { AUDIO_ACCEPT, MAX_AUDIO_BYTES, MAX_RECORD_SECONDS, recordingExtension, recordingReminder, validateAudio } from "@/lib/audio";
 import { convertScript, MAX_LENGTH, resolveScript, type Script } from "@/lib/translation";
 
+import { playAudioSegment } from "@/lib/audio-segment";
 import type { TranscriptSegment } from "@/lib/transcription";
 
-export default function VoiceRecorder({ script }: { script: Script }) {
+export default function VoiceRecorder({ script, serviceName = "Groq" }: { script: Script; serviceName?: string }) {
   const [status, setStatus] = useState<"idle" | "requesting" | "recording" | "transcribing" | "translating">("idle");
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState("");
   const [seconds, setSeconds] = useState(0);
   const [segments, setSegments] = useState<TranscriptSegment[]>([]);
+  const stopReplay = useRef<(() => void) | null>(null);
   const originalAudio = useRef<HTMLAudioElement>(null);
   const needsReview = segments.some(segment => segment.issue);
   const [transcript, setTranscript] = useState("");
@@ -41,6 +43,7 @@ export default function VoiceRecorder({ script }: { script: Script }) {
   }
 
   useEffect(() => () => {
+    stopReplay.current?.();
     session.current++;
     request.current?.abort(); request.current = null;
     if (recorder.current?.state === "recording") recorder.current.stop();
@@ -57,11 +60,13 @@ export default function VoiceRecorder({ script }: { script: Script }) {
   function chooseFile(value: File) {
     const invalid = validateAudio(value);
     if (invalid) { setError(invalid); return; }
+    stopReplay.current?.();
     setTranscriptState("idle"); setTranslationState("idle");
     setSegments([]); setSeconds(0); setFile(value); setTranscript(""); setTranslation(""); setError(""); setNotice("");
   }
 
   function cancel() {
+    stopReplay.current?.();
     session.current++;
     request.current?.abort(); request.current = null;
     if (recorder.current?.state === "recording") recorder.current.stop();
@@ -186,20 +191,22 @@ export default function VoiceRecorder({ script }: { script: Script }) {
       </div>
       {status === "recording" && seconds > 0 && recordingReminder(seconds) && <p role="status" aria-live="assertive" className="record-warning">{recordingReminder(seconds)}</p>}
       <label className={`audio-upload ${busy || recording ? "is-disabled" : ""}`}><Upload size={21} /><strong>选择音频文件</strong><small>MP3 · WAV · M4A · WebM · OGG，最长 5 分钟，最大 10 MB</small><input type="file" accept={AUDIO_ACCEPT} disabled={busy || recording} onChange={event => { const value = event.target.files?.[0]; if (value) chooseFile(value); event.target.value = ""; }} /></label>
-      <small>录音与上传均不超过 5 分钟；音频与转写文字会发送至 Groq，使用账户免费额度。</small>
+      <small>录音与上传均不超过 5 分钟；音频与转写文字会发送至 {serviceName}，使用账户额度。</small>
       {file && <div className="audio-preview"><strong>{file.name}</strong><small>{(file.size / 1024 / 1024).toFixed(2)} MB</small>{preview && <audio ref={originalAudio} key={preview} controls src={preview} preload="metadata" />}<button className="primary" disabled={busy || recording} onClick={() => processAudio()}>{status === "transcribing" ? "正在转写…" : status === "translating" ? "正在翻译…" : "开始转写并翻译"}</button></div>}
     </div>
     <p role="alert" className={error ? "feedback error" : "sr-only"}>{error}</p>
     <p role="status" className={`feedback ${needsReview ? "error" : ""}`}>{busy ? (status === "transcribing" ? "正在识别粤语录音…" : "转写已保留，正在翻译普通话…") : notice}</p>
     <div className="voice-results">
-      <section className={`result-card result-${transcriptState}`}><h3>粤语转写 <small>{transcriptState === "confirmed" ? "已确认校对" : transcriptState === "review" ? (needsReview ? "含疑似未识别片段 · 待校对" : "机器转写 · 待校对") : transcriptState === "error" ? "转写失败" : transcriptState === "pending" ? "正在转写" : transcriptState === "edited" ? "已编辑 · 请重新翻译" : "待转写"}</small></h3><label className="sr-only" htmlFor="voice-transcript">粤语转写文本</label><textarea id="voice-transcript" value={transcript} disabled={busy || recording} placeholder="识别结果将在这里显示…" onChange={event => { setTranscript(event.target.value); setTranscriptState("edited"); setTranslationState("idle"); setTranslation(""); setError(""); setNotice(""); }} />
-        {segments.length > 0 && <div className="transcript-segments" aria-label="分段转写校对"><small className="voice-help">原始机器分段 · 警示片段需复听；编辑上方原文后再确认翻译。</small>{segments.map((segment, index) => <div key={index} className={segment.issue ? "transcript-segment is-uncertain" : "transcript-segment"}>
+      <section className={`result-card result-${transcriptState}`}><h3>粤语转写 <small>{transcriptState === "confirmed" ? "已确认校对" : transcriptState === "review" ? (needsReview ? "含疑似未识别片段 · 待校对" : "机器转写 · 待校对") : transcriptState === "error" ? "转写失败" : transcriptState === "pending" ? "正在转写" : transcriptState === "edited" ? "已编辑 · 请重新翻译" : "待转写"}</small></h3>
+        {segments.length > 0 && <div className="transcript-segments" aria-label="分段转写校对"><small className="voice-help">原始机器分段 · 警示片段需复听；在下方校对原文后再确认翻译。</small>{segments.map((segment, index) => <div key={index} className={segment.issue ? "transcript-segment is-uncertain" : "transcript-segment"}>
           <small>{segment.start !== null && segment.end !== null ? `${segment.start.toFixed(1)}–${segment.end.toFixed(1)} 秒 · ` : ""}{segment.issue ? `⚠ ${segment.issue}` : "机器识别 · 请核对"}</small>
           <p>{convertScript(segment.text, resolved)}</p>
-          {segment.start !== null && <button type="button" className="text-action" onClick={() => { const audio = originalAudio.current; if (audio) { audio.currentTime = segment.start!; void audio.play().catch(() => setError("原音播放失败，请使用上方播放器重试。")); } }}>复听此处原音</button>}
+          {segment.start !== null && segment.end !== null && <button type="button" className="text-action" onClick={() => { stopReplay.current?.(); const audio = originalAudio.current; if (audio) stopReplay.current = playAudioSegment(audio, segment.start!, segment.end!, () => setError("原音播放失败，请使用上方播放器重试。")); }}>复听本句原音</button>}
         </div>)}</div>}
-        {text && Array.from(text).length <= MAX_LENGTH && <JyutpingText key={text} text={text} suspectTexts={segments.filter(segment => segment.issue).map(segment => convertScript(segment.text, resolved))} />}
+        <label className="sr-only" htmlFor="voice-transcript">粤语转写文本</label><textarea id="voice-transcript" value={transcript} disabled={busy || recording} placeholder="识别结果将在这里显示…" onChange={event => { setTranscript(event.target.value); setTranscriptState("edited"); setTranslationState("idle"); setTranslation(""); setError(""); setNotice(""); }} />
+
         <button className="text-action" disabled={!transcript.trim() || busy || recording || Array.from(transcript).length > MAX_LENGTH} onClick={() => processAudio(true)}>{needsReview ? "已对照原音校对，翻译普通话" : "确认原文并翻译普通话"}</button>
+        {text && Array.from(text).length <= MAX_LENGTH && <JyutpingText key={text} text={text} suspectTexts={segments.filter(segment => segment.issue).map(segment => convertScript(segment.text, resolved))} />}
       </section>
       <section className={`result-card result-${translationState}`}><h3>普通话翻译 <small>{translationState === "success" ? "✓ 已翻译" : translationState === "error" ? "翻译失败 · 粤语原文已保留" : translationState === "blocked" ? "转写待校对 · 已暂停翻译" : translationState === "pending" ? "正在翻译" : "待翻译"}</small></h3>{translation ? <p className="voice-translation" lang="zh-CN">{convertScript(translation, resolved)}</p> : <p className="voice-help">{translationState === "blocked" ? "存在疑似未识别的片段，请先复听并校对左侧原文，避免将猜测当作译文。" : translationState === "error" ? "翻译未完成。左侧粤语原文已保留，可校对后点击“翻译普通话”重试。" : "转写完成后自动翻译；翻译失败时仍保留粤语原文。"}</p>}</section>
     </div>

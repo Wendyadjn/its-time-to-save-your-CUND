@@ -1,3 +1,4 @@
+import { getAiService } from "../../../lib/ai-service";
 import { reviewTranscription } from "../../../lib/transcription";
 import { hasAudioSignature, MAX_AUDIO_BYTES, validateAudio } from "../../../lib/audio";
 
@@ -42,34 +43,44 @@ export async function POST(request: Request) {
   } catch { return failure("无法读取上传文件，请重新选择音频。", 400); }
   const durationError = await validateAudioDuration(file);
   if (durationError) return failure(durationError, 422);
-  const key = process.env.GROQ_API_KEY?.trim();
-  if (!key) return failure("请先在 .env.local 配置 GROQ_API_KEY 并重启服务。", 503);
+  const service = getAiService();
+  if (!service) return failure("AI_PROVIDER 只能设置为 groq 或 siliconflow，请检查服务端配置。", 503);
+  const key = service.key;
+  if (!key) return failure(`请先在 .env.local 配置 ${service.keyName} 并重启服务。`, 503);
   const now = Date.now();
   recentRequests = recentRequests.filter(time => now - time < 60_000);
   if (recentRequests.length >= 6) return failure("语音请求过于频繁，请一分钟后重试。", 429);
   recentRequests.push(now);
   const form = new FormData();
   form.set("file", file);
-  form.set("model", "whisper-large-v3");
-  form.set("response_format", "verbose_json");
-  form.append("timestamp_granularities[]", "segment");
-  form.set("temperature", "0");
+  form.set("model", service.speechModel);
+  if (service.id === "groq") {
+    form.set("response_format", "verbose_json");
+    form.append("timestamp_granularities[]", "segment");
+    form.set("temperature", "0");
+  }
   try {
-    const response = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
+    const response = await fetch(`${service.baseUrl}/audio/transcriptions`, {
       method: "POST", headers: { Authorization: `Bearer ${key}` }, body: form,
       signal: AbortSignal.any([request.signal, AbortSignal.timeout(60_000)]), cache: "no-store",
     });
     if (!response.ok) {
+      if (service.id === "siliconflow") return failure(response.status === 429 ? "硅基流动语音额度或速率达到上限，请稍后重试。" : response.status === 401 || response.status === 403 ? "硅基流动拒绝语音请求，请检查 SILICONFLOW_API_KEY、网络及模型访问权限。" : "硅基流动无法完成转写，请检查音频格式后重试。", response.status === 429 ? 429 : 502);
       if (response.status === 429) return failure("Groq 语音免费额度或速率达到上限，请稍后重试。", 429);
       if (response.status === 401) return failure("Groq 密钥验证失败。请检查 .env.local 中的 GROQ_API_KEY；若已更新，请停止并重新启动开发服务。", 502);
-      if (response.status === 403) return failure("语音请求被拒绝。请检查开发服务的网络访问，以及 Groq 项目的 whisper-large-v3 模型权限；这不一定是密钥无效。", 502);
+      if (response.status === 403) {
+        const detail = await response.json().catch(() => null);
+        if (detail?.error?.message === "Access denied. Please check your network settings.") return failure("Groq 拒绝了当前网络的连接。请切换网络或检查 VPN／代理，随后重启开发服务再试；当前无法验证密钥或模型权限。", 502);
+        return failure("语音请求被拒绝。请检查开发服务的网络访问，以及 Groq 项目的 whisper-large-v3 模型权限；这不一定是密钥无效。", 502);
+      }
       if ([400, 413, 422].includes(response.status)) return failure("语音服务无法解析此音频，请换用有效的较短 MP3 或 WAV。", 422);
       return failure("语音服务暂不可用，请稍后重试。", 502);
     }
     const data = await response.json();
     if (typeof data?.text !== "string" || !data.text.trim()) return failure("未识别到语音，请检查音量或换一段清晰录音。", 422);
     if (Array.from(data.text).length > 20_000) return failure("转写结果过长，请分段上传音频。", 422);
-    return Response.json({ text: data.text.trim(), segments: reviewTranscription(data) }, { headers: { "Cache-Control": "no-store" } });
+    const segments = service.id === "groq" ? reviewTranscription(data) : [{ text: data.text.trim(), start: null, end: null, issue: "备用转写未提供分句时间或置信度，请先试听原音并校对全文" }];
+    return Response.json({ text: data.text.trim(), segments }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     if (error instanceof Error && ["AbortError", "TimeoutError"].includes(error.name)) return failure("语音转写超时或已取消，请缩短音频后重试。", 504);
     return failure("语音转写失败，请检查服务端网络后重试。", 502);

@@ -11,10 +11,10 @@ import styles from "@/app/design-lab/design-lab.module.css";
 const concepts = [
   { id: "editorial", number: "01", name: "港式字报", english: "THE CANTO DAILY", description: "像翻开一份会说话的香港文化报。朱红、纸色、大字与细线，文字本身就是主角。", tags: "文化感 / 大字排版 / 编辑式布局" },
   { id: "studio", number: "02", name: "声音实验室", english: "CANTO SOUND STUDIO", description: "把语言学习变成一场声音采样。深色控制台、荧光提示与清晰音轨，适合专注听读。", tags: "声音感 / 深色控制台 / 高对比" },
-  { id: "notebook", number: "03", name: "口语手账", english: "A LITTLE CANTO CLUB", description: "几何装饰背景、便签卡片、统一宋体。译文、播放控制、逐句粤拼分区显示。", tags: "亲近感 / 便签字卡 / 轻松玩味" },
+  { id: "notebook", number: "03", name: "口语手账", english: "YOU SEEM PRETTY SAD FOR SOMEONE SO BAD AT CANTONESE LEARNING", description: "几何装饰背景、便签卡片、统一宋体。译文、播放控制、逐句粤拼分区显示。", tags: "亲近感 / 便签字卡 / 轻松玩味" },
 ] as const;
 
-export default function NotebookApp({ preview = false }: { preview?: boolean }) {
+export default function NotebookApp({ preview = false, serviceName = "Groq" }: { preview?: boolean; serviceName?: string }) {
   const [concept, setConcept] = useState(2);
   const [tab, setTab] = useState<"text" | "voice">("text");
   const [script, setScript] = useState<Script>("simplified");
@@ -75,7 +75,6 @@ export default function NotebookApp({ preview = false }: { preview?: boolean }) 
     <div className={`${styles.preview} ${styles[current.id]}`}>
       <header className={styles.header}>
         <Link href="/" className={styles.brand}><span className={styles.brandMark}>敢</span><span><strong>敢学粤语</strong><small>Olivia Cantorigo</small></span></Link>
-        <div className={styles.headerMeta}><span>{current.english}</span><b>粵 / 普</b></div>
         <div className={styles.script} role="group" aria-label="简繁偏好">{([['auto', '自动'], ['simplified', '简'], ['traditional', '繁']] as const).map(([value, label]) => <button key={value} aria-pressed={script === value} onClick={() => { cancel(); setScript(value); setOutputScript(null); }}>{label}</button>)}</div>
       </header>
 
@@ -83,12 +82,12 @@ export default function NotebookApp({ preview = false }: { preview?: boolean }) 
         <aside className={styles.rail}><span>OC / 01</span><div>听 · 读 · 讲</div><small>TEXT / AUDIO</small></aside>
         <nav className={styles.nav} aria-label="学习方式"><div><button aria-pressed={tab === "text"} onClick={() => { cancel(); setTab("text"); }}><Languages size={17}/><span>{concept === 1 ? "01 / TEXT TRACK" : "文本翻译"}</span></button><button aria-pressed={tab === "voice"} onClick={() => { cancel(); setTab("voice"); }}><Mic size={17}/><span>{concept === 1 ? "02 / VOICE TRACK" : "语音转译"}</span></button></div><span>{tab === "text" ? "双向翻译 · 简繁转换" : "语音转译"}</span></nav>
 
-        {!preview && tab === "text" && <div className={styles.modeBar}><label>翻译方式<select aria-label="翻译方式" value={mode} onChange={event => { cancel(); setMode(event.target.value as "demo" | "api"); setResult(""); setMessage(""); }}><option value="demo">本地例句演示</option><option value="api">Groq AI 翻译</option></select></label><small>{mode === "api" ? "翻译文字会发送至 Groq，使用账户额度。" : "演示支持下方例句及其组合；自由文本请选择 AI 翻译。"}</small></div>}
+        {!preview && tab === "text" && <div className={styles.modeBar}><label>翻译方式<select aria-label="翻译方式" value={mode} onChange={event => { cancel(); setMode(event.target.value as "demo" | "api"); setResult(""); setMessage(""); }}><option value="demo">本地例句演示</option><option value="api">{serviceName} AI 翻译</option></select></label><small>{mode === "api" ? `翻译文字会发送至 ${serviceName}，使用账户额度。` : "演示支持下方例句及其组合；自由文本请选择 AI 翻译。"}</small></div>}
         <section className={styles.workspace} aria-label={tab === "text" ? "文本翻译" : "语音转译"}>
           {tab === "text" ? <>
             <div className={styles.inputCard}><div className={styles.cardTop}><span><b>01</b> {reverse ? "粤语原文" : "普通话原文"}</span><small>INPUT</small></div><label className="sr-only" htmlFor="demo-input">输入原文</label><textarea id="demo-input" value={convertScript(input, resolved)} onChange={event => edit(event.target.value)} /><div className={styles.inputBottom}><span>{Array.from(input).length} / 3000</span><div><button onClick={paste}>粘贴</button><button disabled={!input} onClick={() => edit("")}>清空</button></div></div>{reverse && input.trim() && Array.from(input).length <= 3000 && <JyutpingText key={`input-${input}`} text={convertScript(input,resolved)} />}<div className={styles.translateActions}><button className={styles.swap} aria-label="交换翻译方向" onClick={() => { cancel(); setReverse(!reverse); edit(result ? output : ""); }}><ArrowDownUp size={18}/></button><button className={styles.translate} disabled={loading || !input.trim() || Array.from(input).length > 3000} onClick={translate}>{loading ? "翻译中…" : "翻译这句话"} <ArrowRight size={17}/></button></div></div>
             <div className={styles.outputCard}><div className={styles.cardTop}><span><b>02</b> {reverse ? "普通话表达" : "粤语白话"}</span><button disabled={!result} onClick={() => setOutputScript((outputScript ?? resolved) === "traditional" ? "simplified" : "traditional")}>简 / 繁</button><button disabled={!result} aria-label="复制译文" onClick={async () => {try {await navigator.clipboard.writeText(output);setMessage("已复制译文");}catch {setMessage("请选中译文手动复制。");}}}><Copy size={15}/></button></div>{result ? <><p className={styles.translation}>{output}</p><div className={styles.annotationLabel}><AudioLines size={15}/> {reverse ? "普通话译文" : "粤拼与发音"}</div>{!reverse && <JyutpingText key={output} text={output}/>}</> : <div className={styles.empty}><Sparkles size={30}/><p>{loading ? "正在生成译文…" : "翻译结果将在此显示。"}</p></div>}</div>
-          </> : <div className={styles.voice}><VoiceRecorder script={script}/></div>}
+          </> : <div className={styles.voice}><VoiceRecorder script={script} serviceName={serviceName}/></div>}
         </section>
         <p className={styles.feedback} role="status">{message}</p>
         {tab === "text" && <section className={styles.examples}><div className={styles.examplesTitle}><span>{concept === 0 ? "日常切片" : concept === 1 ? "QUICK SAMPLES" : "常用例句"}</span><small>点击任意卡片试用 <ArrowRight size={13}/></small></div><div className={styles.exampleGrid}>{examples.map((example,index) => <button key={example.label} onClick={() => loadExample(index)}><span className={styles.exampleNumber}>0{index+1} <small>{example.label}</small></span><strong>{convertScript(example.cantonese,resolved)}</strong><span>{example.mandarin}</span><ArrowRight size={17}/></button>)}</div></section>}

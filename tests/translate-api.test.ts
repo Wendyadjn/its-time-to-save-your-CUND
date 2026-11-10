@@ -7,6 +7,8 @@ test("翻译路由校验、保密、双向请求与上游错误处理（不调�
   let result = new Response();
   let thrown: Error | null = null;
   let calls = 0;
+  let now = Date.now();
+  t.mock.method(Date, "now", () => now);
   let sent: Record<string, unknown> = {};
   const mock = t.mock.method(globalThis, "fetch", async (_url: string, options: RequestInit) => {
     calls++;
@@ -71,6 +73,14 @@ test("翻译路由校验、保密、双向请求与上游错误处理（不调�
     const before = calls;
     assert.equal((await POST(request(valid))).status, 429);
     assert.equal(calls, before);
+    now += 60_001;
+    result = Response.json({ error: { message: "Access denied. Please check your network settings." } }, { status: 403 });
+    const denied = await POST(request(valid));
+    assert.equal(denied.status, 502);
+    assert.match((await denied.json()).error, /Groq 拒绝了当前网络/);
+    result = new Response("private-provider-detail", { status: 403 });
+    const forbidden = await POST(request(valid));
+    assert.match((await forbidden.json()).error, /翻译模型访问权限/);
   } finally {
     mock.mock.restore();
     if (previous === undefined) delete process.env.GROQ_API_KEY;

@@ -90,6 +90,12 @@ test("转写 API 校验与错误恢复，不调用真实 Groq", async t => {
     const before = calls;
     assert.equal((await POST(request())).status, 429);
     assert.equal(calls, before);
+    now += 60_001;
+    thrown = null;
+    result = Response.json({ error: { message: "Access denied. Please check your network settings." } }, { status: 403 });
+    const deniedNetwork = await POST(request());
+    assert.equal(deniedNetwork.status, 502);
+    assert.match((await deniedNetwork.json()).error, /Groq 拒绝了当前网络/);
   } finally {
     if (previous === undefined) delete process.env.GROQ_API_KEY;
     else process.env.GROQ_API_KEY = previous;

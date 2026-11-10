@@ -1,7 +1,7 @@
+import { getAiService } from "../../../lib/ai-service";
 import { MAX_LENGTH, type Direction } from "../../../lib/translation";
 
 export const runtime = "nodejs";
-const MODEL = "qwen/qwen3.8-27b";
 const MAX_BODY_BYTES = 32_000;
 // shortcut: 单进程共享限流只适合本地试用，公开多实例部署前需登录与持久化限流。
 let recentRequests: number[] = [];
@@ -46,8 +46,10 @@ export async function POST(request: Request) {
   const text = body.text.trim();
   if (!text || Array.from(text).length > MAX_LENGTH) return failure(`请输入 1–${MAX_LENGTH} 字文本。`, 400);
   const direction = body.direction as Direction;
-  const apiKey = process.env.GROQ_API_KEY?.trim();
-  if (!apiKey) return failure("尚未配置 API。请在 .env.local 中设置 GROQ_API_KEY，并重启服务；也可切换本地演示。", 503);
+  const service = getAiService();
+  if (!service) return failure("AI_PROVIDER 只能设置为 groq 或 siliconflow，请检查服务端配置。", 503);
+  const apiKey = service.key;
+  if (!apiKey) return failure(`尚未配置 ${service.name}。请在 .env.local 中设置 ${service.keyName} 并重启服务；也可切换本地演示。`, 503);
 
   const now = Date.now();
   recentRequests = recentRequests.filter(time => now - time < 60_000);
@@ -55,15 +57,13 @@ export async function POST(request: Request) {
   recentRequests.push(now);
 
   try {
-    const upstream = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    const upstream = await fetch(`${service.baseUrl}/chat/completions`, {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: MODEL,
+        model: service.translationModel,
         temperature: 0.3,
-        reasoning_effort: "none",
-        reasoning_format: "hidden",
-        max_completion_tokens: 4096,
+        ...(service.id === "groq" ? { reasoning_effort: "none", reasoning_format: "hidden", max_completion_tokens: 4096 } : { max_tokens: 4096 }),
         response_format: { type: "json_object" },
         messages: [
           { role: "system", content: `你是粤语与普通话翻译员。${direction === "mandarin-cantonese"
@@ -76,8 +76,14 @@ export async function POST(request: Request) {
       cache: "no-store",
     });
     if (!upstream.ok) {
+      if (service.id === "siliconflow") return failure(upstream.status === 429 ? "硅基流动额度或速率达到上限，请稍后重试。" : upstream.status === 401 || upstream.status === 403 ? "硅基流动拒绝请求，请检查 SILICONFLOW_API_KEY、网络及模型访问权限。" : "硅基流动翻译暂不可用，请稍后重试。", upstream.status === 429 ? 429 : 502);
       if (upstream.status === 429) return failure("Groq 免费额度或速率达到上限，请稍后重试，并在控制台查看额度。", 429);
-      if ([401, 403].includes(upstream.status)) return failure("Groq 密钥无效或当前账户没有模型访问权限，请检查服务端配置。", 502);
+      if (upstream.status === 401) return failure("Groq 密钥验证失败。请检查 .env.local 中的 GROQ_API_KEY；若已更新，请停止并重新启动开发服务。", 502);
+      if (upstream.status === 403) {
+        const detail = await upstream.json().catch(() => null);
+        if (detail?.error?.message === "Access denied. Please check your network settings.") return failure("Groq 拒绝了当前网络的连接。请切换网络或检查 VPN／代理，随后重启开发服务再试；当前无法验证密钥或模型权限。", 502);
+        return failure("Groq 拒绝翻译请求，请检查服务端网络及当前项目的翻译模型访问权限。", 502);
+      }
       return failure("翻译服务暂不可用，请稍后重试；若持续失败，请检查 Groq 控制台中的模型状态。", 502);
     }
     const data = await upstream.json();
@@ -89,7 +95,7 @@ export async function POST(request: Request) {
     if (!output || typeof output.translation !== "string" || !output.translation.trim() || Array.from(output.translation).length > 12_000) {
       return failure("翻译服务返回了无效译文，请重试。", 502);
     }
-    return Response.json({ translation: output.translation.trim(), provider: "Groq", model: MODEL }, { headers: { "Cache-Control": "no-store" } });
+    return Response.json({ translation: output.translation.trim(), provider: service.name, model: service.translationModel }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     if (error instanceof Error && ["TimeoutError", "AbortError"].includes(error.name)) return failure("翻译超时或已取消，请重试。", 504);
     return failure("翻译请求失败，请检查服务端网络后重试。", 502);
