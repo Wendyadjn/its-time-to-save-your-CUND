@@ -1,3 +1,4 @@
+import { trackServiceCall } from "../../../lib/service-usage";
 import { getAiService } from "../../../lib/ai-service";
 import { MAX_LENGTH, type Direction } from "../../../lib/translation";
 
@@ -46,7 +47,8 @@ export async function POST(request: Request) {
   const text = body.text.trim();
   if (!text || Array.from(text).length > MAX_LENGTH) return failure(`请输入 1–${MAX_LENGTH} 字文本。`, 400);
   const direction = body.direction as Direction;
-  const service = getAiService();
+  if ("provider" in body && !["groq", "siliconflow"].includes(body.provider as string)) return failure("翻译服务选择无效。", 400);
+  const service = getAiService("provider" in body ? body.provider as string : undefined);
   if (!service) return failure("AI_PROVIDER 只能设置为 groq 或 siliconflow，请检查服务端配置。", 503);
   const apiKey = service.key;
   if (!apiKey) return failure(`尚未配置 ${service.name}。请在 .env.local 中设置 ${service.keyName} 并重启服务；也可切换本地演示。`, 503);
@@ -56,6 +58,7 @@ export async function POST(request: Request) {
   if (recentRequests.length >= 10) return failure("本站请求过于频繁，请稍后再试。", 429);
   recentRequests.push(now);
 
+  return trackServiceCall("translate", service.id, Array.from(text).length, async () => {
   try {
     const upstream = await fetch(`${service.baseUrl}/chat/completions`, {
       method: "POST",
@@ -100,4 +103,5 @@ export async function POST(request: Request) {
     if (error instanceof Error && ["TimeoutError", "AbortError"].includes(error.name)) return failure("翻译超时或已取消，请重试。", 504);
     return failure("翻译请求失败，请检查服务端网络后重试。", 502);
   }
+  });
 }

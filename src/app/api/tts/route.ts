@@ -1,3 +1,4 @@
+import { trackServiceCall } from "../../../lib/service-usage";
 export const runtime = "nodejs";
 // shortcut: 单进程限流只适合本地试用，公开部署前需登录与持久化限流。
 let recentRequests: number[] = [];
@@ -43,6 +44,7 @@ export async function POST(request: Request) {
   recentRequests = recentRequests.filter(time => now - time < 60000);
   if (recentRequests.length >= 20) return failure("朗读请求过于频繁，请稍后重试。", 429);
   recentRequests.push(now);
+  return trackServiceCall("tts", "ondoku", Array.from(text).length, async () => {
   try {
     const response = await fetch("https://ondoku3.com/text_to_speech_api/", {
       method: "POST", headers: { "Content-Type": "application/json", token },
@@ -59,4 +61,5 @@ export async function POST(request: Request) {
   } catch (error) {
     return failure(error instanceof Error && ["AbortError", "TimeoutError"].includes(error.name) ? "语音生成超时或已取消，请重试。" : "无法连接 Ondoku 或音频响应无效，请稍后重试。", error instanceof Error && ["AbortError", "TimeoutError"].includes(error.name) ? 504 : 502);
   }
+  });
 }

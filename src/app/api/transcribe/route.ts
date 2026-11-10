@@ -1,3 +1,4 @@
+import { trackServiceCall } from "../../../lib/service-usage";
 import { getAiService } from "../../../lib/ai-service";
 import { reviewTranscription } from "../../../lib/transcription";
 import { hasAudioSignature, MAX_AUDIO_BYTES, validateAudio } from "../../../lib/audio";
@@ -18,6 +19,7 @@ export async function POST(request: Request) {
   }
   if (!request.headers.get("content-type")?.startsWith("multipart/form-data;")) return failure("请使用音频文件上传请求。", 415);
   let file: File;
+  let provider: string | undefined;
   try {
     const reader = request.body?.getReader();
     if (!reader) return failure("请上传音频。", 400);
@@ -34,6 +36,9 @@ export async function POST(request: Request) {
     let offset = 0;
     for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
     const form = await new Response(bytes, { headers: { "Content-Type": request.headers.get("content-type")! } }).formData();
+    const selected = form.get("provider");
+    if (selected !== null && (typeof selected !== "string" || !["groq", "siliconflow"].includes(selected) || form.getAll("provider").length !== 1)) return failure("转写服务选择无效。", 400);
+    provider = selected ?? undefined;
     const audio = form.get("file");
     if (!(audio instanceof File) || form.getAll("file").length !== 1) return failure("请上传一个音频文件。", 400);
     file = audio;
@@ -43,7 +48,7 @@ export async function POST(request: Request) {
   } catch { return failure("无法读取上传文件，请重新选择音频。", 400); }
   const durationError = await validateAudioDuration(file);
   if (durationError) return failure(durationError, 422);
-  const service = getAiService();
+  const service = getAiService(provider);
   if (!service) return failure("AI_PROVIDER 只能设置为 groq 或 siliconflow，请检查服务端配置。", 503);
   const key = service.key;
   if (!key) return failure(`请先在 .env.local 配置 ${service.keyName} 并重启服务。`, 503);
@@ -59,6 +64,7 @@ export async function POST(request: Request) {
     form.append("timestamp_granularities[]", "segment");
     form.set("temperature", "0");
   }
+  return trackServiceCall("transcribe", service.id, 0, async () => {
   try {
     const response = await fetch(`${service.baseUrl}/audio/transcriptions`, {
       method: "POST", headers: { Authorization: `Bearer ${key}` }, body: form,
@@ -85,4 +91,5 @@ export async function POST(request: Request) {
     if (error instanceof Error && ["AbortError", "TimeoutError"].includes(error.name)) return failure("语音转写超时或已取消，请缩短音频后重试。", 504);
     return failure("语音转写失败，请检查服务端网络后重试。", 502);
   }
+  });
 }

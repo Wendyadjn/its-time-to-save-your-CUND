@@ -9,7 +9,7 @@ import { convertScript, MAX_LENGTH, resolveScript, type Script } from "@/lib/tra
 import { playAudioSegment } from "@/lib/audio-segment";
 import type { TranscriptSegment } from "@/lib/transcription";
 
-export default function VoiceRecorder({ script, serviceName = "Groq" }: { script: Script; serviceName?: string }) {
+export default function VoiceRecorder({ script, serviceName = "Groq", provider }: { script: Script; serviceName?: string; provider?: string }) {
   const [status, setStatus] = useState<"idle" | "requesting" | "recording" | "transcribing" | "translating">("idle");
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState("");
@@ -34,6 +34,15 @@ export default function VoiceRecorder({ script, serviceName = "Groq" }: { script
   const recording = status === "recording" || status === "requesting";
   const resolved = resolveScript(transcript, script);
   const text = convertScript(transcript, resolved);
+
+  useEffect(() => {
+    if (request.current) {
+      request.current.abort(); request.current = null; setStatus("idle");
+      setTranscriptState(previous => previous === "pending" ? "idle" : previous);
+      setTranslationState(previous => previous === "pending" ? "idle" : previous);
+      setNotice("服务已切换，正在处理的请求已取消，已有转写仍保留。");
+    }
+  }, [provider]);
 
   function releaseMicrophone() {
     if (cutoff.current) { clearTimeout(cutoff.current); cutoff.current = null; }
@@ -141,7 +150,7 @@ export default function VoiceRecorder({ script, serviceName = "Groq" }: { script
     try {
       if (!translateOnly) {
         setStatus("transcribing"); setTranscriptState("pending");
-        const form = new FormData(); form.set("file", file!);
+        const form = new FormData(); form.set("file", file!); if (provider) form.set("provider", provider);
         const response = await fetch("/api/transcribe", { method: "POST", body: form, signal: controller.signal });
         const data = await response.json();
         if (request.current !== controller) return;
@@ -161,7 +170,7 @@ export default function VoiceRecorder({ script, serviceName = "Groq" }: { script
       setStatus("translating"); setTranslationState("pending");
       const response = await fetch("/api/translate", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: recognized, direction: "cantonese-mandarin" }), signal: controller.signal,
+        body: JSON.stringify({ provider, text: recognized, direction: "cantonese-mandarin" }), signal: controller.signal,
       });
       const data = await response.json();
       if (request.current !== controller) return;

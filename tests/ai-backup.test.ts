@@ -13,7 +13,7 @@ function wav() {
   const form = new FormData(); form.set("file", new File([bytes], "test.wav", { type: "audio/wav" }));
   return new Request("http://localhost:3000/api/transcribe", { method: "POST", body: form });
 }
-const translation = () => new Request("http://localhost:3000/api/translate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: "我们去喝茶。", direction: "mandarin-cantonese" }) });
+const translation = (provider?: string) => new Request("http://localhost:3000/api/translate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ provider, text: "我们去喝茶。", direction: "mandarin-cantonese" }) });
 
 test("备用服务使用独立密钥和模型，不请求 Groq；缺失置信度时保留校对警示", async t => {
   const previous = { provider: process.env.AI_PROVIDER, key: process.env.SILICONFLOW_API_KEY };
@@ -67,6 +67,10 @@ test("备用服务使用独立密钥和模型，不请求 Groq；缺失置信度
     status = 200; invalid = true;
     assert.equal((await translate(translation())).status, 502);
     assert.equal((await transcribe(wav())).status, 422);
+    process.env.AI_PROVIDER = "groq";
+    invalid = false;
+    assert.equal((await translate(translation("siliconflow"))).status, 200);
+    assert.equal((await translate(translation("unknown"))).status, 400);
     process.env.AI_PROVIDER = "typo";
     assert.equal(getAiService(), null);
     assert.equal((await translate(translation())).status, 503);
