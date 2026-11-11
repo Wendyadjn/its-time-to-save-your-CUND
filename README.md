@@ -1,222 +1,73 @@
-# 敢学粤语 Olivia Cantorigo · v2.1.1
+# 敢学粤语 · Olivia Cantorigo
 
-you seem pretty sad for someone so bad at cantonese
+用于粤语学习的 Web 应用，支持粤普双向翻译、粤拼标注、互动朗读和录音转写，并可将学习内容保存到私有云端历史。
 
-粤语学习网页：该网页支持粤普双向翻译、逐字粤拼与发音、以及录音 / 上传转写和普通话翻译。语音朗读来自 Ondoku HiuGaai。
+当前版本：[v2.1.1](https://github.com/Wendyadjn/its-time-to-save-your-CUND/tree/v2.1.1) · [更新记录](CHANGELOG.md)
 
-基于 Next.js App Router、React、TypeScript、Tailwind CSS 4 和 Lucide，支持桌面双栏与移动端上下布局。
+## 功能
 
-## 快速开始
+| 功能 | 使用方式 |
+| --- | --- |
+| 粤普翻译 | 双向翻译，支持简体、香港繁体与自动判断；内置例句可离线演示 |
+| 粤拼与朗读 | 汉字对齐粤拼；播放全文、单句或单字，支持 1–2 倍速；使用 Ondoku HiuGaai 声线 |
+| 语音转译 | 录音或上传音频，转写粤语并翻译为普通话；疑似不可靠片段需人工校对 |
+| 私有历史 | 邮箱登录后手动保存文字，可选保存原音；支持搜索、复听、继续编辑与删除 |
+| 服务与用量 | 切换 Groq / 硅基流动，查看调用状态、本站每日上限和可获取的官方额度信息 |
 
-需要 Node.js 20.9 或以上。克隆仓库后，在项目根目录运行：
+## 本地运行
+
+需要 **Node.js 22 或以上**、npm。首次下载并启动：
 
 ```sh
+git clone https://github.com/Wendyadjn/its-time-to-save-your-CUND.git
+cd its-time-to-save-your-CUND
 npm ci
 cp .env.example .env.local
-```
-
-编辑 `.env.local`，填写两个服务端密钥：
-
-```dotenv
-GROQ_API_KEY=你的Groq密钥
-ONDOKU_TOKEN=你的Ondoku访问令牌
-```
-
-- Groq：在 [API Keys](https://console.groq.com/keys) 创建密钥，用于文本翻译和语音转写。
-- Ondoku：登录后在 [Access Token 页面](https://ondoku3.com/en/users/extension/) 获取令牌，用于 HiuGaai 粤语朗读。
-- 已有 `.env.local` 时直接编辑，不要用模板覆盖已有配置。无需在密钥名称前添加 `NEXT_PUBLIC_`。
-- `.env.local` 已被 Git 忽略；仓库仅包含空白模板。不要提交或公开真实密钥。
-
-启动网页：
-
-```sh
 npm run dev
 ```
 
-打开 [localhost:3000](http://localhost:3000/)。修改密钥后停止旧服务（Control+C），重新启动。
+打开 [localhost:3000](http://localhost:3000/)。无需密钥即可尝试内置例句；自由文本翻译、转写和朗读需配置对应服务。已有 `.env.local` 时不要再次复制模板，以免覆盖配置。
 
-未配置密钥时可使用本地例句翻译；AI 翻译、语音转写和 Ondoku 朗读需要各自的密钥。免费额度和费用以服务商账户为准，项目不会判断账户是否已启用付费。
+### 按需配置服务
 
-## Groq 不可用时的备用方案
+在项目根目录的 `.env.local` 填写需要的项目；不必配置全部服务。修改后重启开发服务。
 
-翻译和语音转写可切换至硅基流动，朗读仍使用 Ondoku。到 [硅基流动控制台](https://cloud.siliconflow.cn/) 获取 API Key，在 `.env.local` 设置：
+| 用途 | 环境变量 | 获取与配置 |
+| --- | --- | --- |
+| 翻译与转写：Groq | `AI_PROVIDER=groq`、`GROQ_API_KEY` | [创建 API Key](https://console.groq.com/keys) |
+| 翻译与转写：硅基流动 | `AI_PROVIDER=siliconflow`、`SILICONFLOW_API_KEY` | [控制台](https://cloud.siliconflow.cn/) |
+| 粤语朗读 | `ONDOKU_TOKEN` | [Ondoku Access Token](https://ondoku3.com/en/users/extension/) |
+| 私有云端历史（可选） | `SUPABASE_URL`、`SUPABASE_PUBLISHABLE_KEY` | 按 [Supabase 配置指南](docs/supabase-setup.md) 建表并设置权限 |
 
-```dotenv
-AI_PROVIDER=siliconflow
-SILICONFLOW_API_KEY=你的备用服务密钥
-```
+两家翻译服务都配置后可在页面手动切换；失败时不会自动转发给另一家。硅基流动转写不提供片段时间与置信度，结果需全文校对后确认翻译，不能定位单句原音。
 
-停止并重新启动开发服务；生产部署需更新服务器环境变量并重启。恢复 Groq 时设置 `AI_PROVIDER=groq`，已有 `GROQ_API_KEY` 无需删除。服务只读取当前选择的密钥，页面显示当前服务名称；不会自动将失败请求转发至另一家服务。
+服务商密钥只在服务器使用，不加 `NEXT_PUBLIC_` 前缀，也不要提交 GitHub。Supabase 的公开连接信息会提供给浏览器，只能使用 Publishable / legacy anon key，不能使用 Secret / service_role key。完整变量见 [.env.example](.env.example)。
 
-备用模型固定为 `XingChenAGI/Xing4.0-29B`（翻译）与 `FunAudioLLM/SenseVoiceSmall`（转写）。[官方价格页](https://www.siliconflow.cn/pricing) 当前列为免费，实际访问权限、速率限制及未来价格以服务商为准；程序不自动切换至收费模型。
+## 使用边界与数据保存
 
-备用转写接口只返回文字，没有逐段时间或置信度。因此结果标为全文待校对、暂停自动翻译，不提供无依据的分句原音定位；可使用上方原音播放器校对、编辑后确认翻译。五分钟、10 MB、格式与来源校验继续生效。切换后文字/音频发送至硅基流动，适用该服务商的数据政策。密钥只保存在服务器，不提交 GitHub。
+- 文本翻译输入最多 **3,000 字**；音频最长 **5 分钟、最大 10 MB**，支持 MP3、WAV、M4A、WebM、OGG。录音需要麦克风权限及 HTTPS 或 localhost。
+- 录音停止后可先本地试听，点击转写才发送给所选服务商。机器转写、翻译和多音字注音可能出错；质量提示不能保证发现所有漏字或幻觉。
+- 只有主动保存才将文字留存到 Supabase，原音默认不保存。切离语音标签会清除未保存的临时内容；退出或切换账号也会清空工作区。删除云端历史及关联原音后，网页不提供恢复功能。
+- 翻译、转写和朗读内容会发送至对应服务商，适用其数据政策；Ondoku 会保留生成历史。取消本地等待不保证取消服务商任务或费用。
+- **本站每日上限不等于官方余额。** Groq 显示最近响应中的速率额度；Ondoku 只能记录手动核对快照；硅基流动国内站余额需到官网核对。免费额度、价格及模型权限以服务商账户为准。
 
-## 功能与使用
+## 开发与部署
 
-### 文本翻译与粤拼学习
-
-1. 默认进入“本地例句演示”，点击下方例句后翻译；演示仅支持内置例句及其组合。
-2. 在“翻译方式”选择“Groq AI 翻译”，可输入 1–3000 字自由文本。
-3. 使用方向交换按钮切换普通话 → 粤语白话、粤语白话 → 普通话。
-4. 全局默认简体，提供简体、香港繁体、自动偏好；自动根据输入字形判断，共用字默认简体。译文也可单独切换简繁。
-5. 粤语译文、粤语输入学习区和语音转写结果使用 Ruby 显示粤拼。点击汉字查看字卡并朗读，未知读音显示 `—`。
-
-支持粘贴、清空、字数统计和复制纯译文。输入变化会清除旧译文并取消旧请求；API 失败不会用演示结果替代。剪贴板功能需要浏览器许可及 HTTPS / localhost。
-
-### Ondoku HiuGaai 朗读
-
-- 当前声线固定为 `zh-HK-HiuGaaiNeural`，合成语速 1；播放器提供 x1、x1.25、x1.5、x2，播放中可调整，倍速变化不重新生成音频、不额外消耗生成字数。
-- 支持播放全文、句首喇叭 / 句子空白处播放单句、点击汉字播放单字，以及停止播放。
-- 全文一次生成并连贯播放，保留单句播放；首次生成可能需要等待。
-- 当前页面复用最近 100 条文字对应的音频地址，刷新后清除，不持久化音频文件；地址失效时需重新生成。
-- 点击播放会把文字发送给 Ondoku，并使用账户字数额度。界面提供 Ondoku 来源署名。服务商保留生成历史，可在其网站管理。
-- 浏览器若阻止播放，请再次点击；当前不自动切换回设备声线。
-
-原设备语音播放器代码仍保留在 `src/lib/speech.ts`，当前界面仅复用其中的分句功能。
-
-### 语音转译
-
-1. 在“语音转译”点击开始录音并授权麦克风，再点击停止；到五分钟自动停止，剩余 30、10、5 秒时提醒。
-2. 或上传 MP3、WAV、M4A、WebM、OGG，单文件不超过五分钟且最大 10 MB，服务端检测时长。
-3. 先本地试听，点击“开始转写并翻译”才上传；停止录音不会自动发送。
-4. Groq Whisper 转写后自动翻译普通话。粤语转写可校对、显示粤拼并朗读。
-5. 修改转写后可单独重新翻译，无需再次上传。超过 3000 字的转写会保留，需缩短后翻译；翻译失败也会保留原文。
-
-录音需要 HTTPS / localhost 及支持 MediaRecorder 的浏览器。取消或切离语音标签会释放麦克风并终止本页操作；切离标签会清除语音模块临时数据。
-
-## API 与数据流
-
-所有服务商密钥仅在服务端使用，不返回浏览器。
-
-| 路径 | 用途 | 当前服务 / 模型 | 本站单进程上限 |
-| --- | --- | --- | --- |
-| `POST /api/translate` | 粤普双向翻译 | Groq `qwen/qwen3.8-27b` | 10 次 / 分钟 |
-| `POST /api/transcribe` | 音频转写 | Groq `whisper-large-v3` | 6 次 / 分钟 |
-| `POST /api/tts` | 粤语音频生成 | Ondoku HiuGaai | 20 次 / 分钟 |
-
-文本翻译接收 JSON：`text`、`direction`（`mandarin-cantonese` / `cantonese-mandarin`）；转写接收 multipart 文件字段 `file`；朗读接收 JSON 字段 `text`，单次最多 12000 字。
-
-接口校验来源、请求格式和大小，并设置超时、限流及错误提示；音频上传还检查扩展名、MIME 和常见容器签名，服务端使用 FFprobe 扫描音频包并拒绝超过五分钟的文件，检测临时文件在结束后删除，完整转写由上游处理。翻译请求体最多 32 KB，朗读最多 64 KB。
-
-- 翻译服务端超时 30 秒，客户端 35 秒；转写服务端 60 秒，客户端转写加翻译整条链路 100 秒；朗读生成服务端 60 秒，客户端单次请求 65 秒。
-- 文字和音频会发送至对应服务商，数据处理适用其政策。未点击保存时，应用不将用户音频或转写保存到数据库；登录后可主动保存到私有 Supabase 历史，原音需单独勾选。
-- 停止播放或取消请求可以终止本地等待，但已提交给服务商的生成任务仍可能计入额度。
-- Origin 校验不是身份认证。当前限流由单进程全部用户共享，公开部署前需要登录 / 网关访问保护和持久化限流，以保护账户额度。
-
-## 目录结构
-
-```text
-src/app/
-  layout.tsx                  # 元信息、全局样式入口
-  page.tsx                    # 单页 Dashboard
-  globals.css                 # 共享样式、粤拼、播放高亮与弹窗
-  design-lab/                 # 三套设计预览与手账主题样式
-  api/translate/route.ts      # Groq 翻译代理
-  api/transcribe/route.ts     # 音频校验与 Whisper 代理
-  api/tts/route.ts            # Ondoku 代理与音频响应校验
-src/components/
-  notebook-app.tsx            # 正式手账界面及设计方案预览
-  cantonese-app.tsx           # 保留的 v1.0 原版界面
-  jyutping-text.tsx           # Ruby 注音、字卡、朗读与高亮
-  voice-recorder.tsx          # 录音、试听、上传、编辑与重新翻译
-src/lib/
-  translation.ts             # OpenCC、演示词库、类型与字数上限
-  jyutping.ts                # to-jyutping 注音
-  audio.ts                   # 音频格式、大小与容器签名
-  ondoku-speech.ts            # 网络音频队列、缓存、取消与播放事件
-  speech.ts                  # 分句及原设备语音实现
-tests/                       # 翻译、注音、音频、API 与播放回归测试
-.env.example                 # 不含真实密钥的配置模板
-```
-
-运行依赖：`next`、`react`、`react-dom`、`lucide-react`、`opencc-js`、`to-jyutping`、`@ffprobe-installer/ffprobe`、`@supabase/supabase-js`。
-
-## 检查与生产运行
+技术栈：Next.js App Router、React、TypeScript、Tailwind CSS、Supabase；粤拼使用 `to-jyutping`，简繁转换使用 OpenCC，音频时长由 FFprobe 校验。
 
 ```sh
-npm test
+npm test            # 模拟服务商与播放引擎，不消耗真实 API 额度
 npm run typecheck
 npm run build
 npm start
 ```
 
-生产构建使用 Webpack。测试使用模拟上游和播放引擎，不需要真实密钥，也不消耗 API 额度；覆盖简繁转换、演示翻译、注音对齐、音频校验、接口错误处理、播放取消及 Ondoku 返回格式兼容。
+部署需要支持 **Next.js 服务端路由**的运行环境，不能只用 GitHub Pages 等静态托管。将所需环境变量配置到部署平台；启用历史时，还需设置 Supabase 正式站点与回调地址。
 
-部署需要支持 Next.js 服务端路由的环境，不能只使用静态文件托管。在托管平台配置 `GROQ_API_KEY` 和 `ONDOKU_TOKEN` 并重新部署；GitHub 源码与版本标签不包含本地密钥，也不代表网站已上线。
+历史登录目前只保护私有历史，**不限制翻译、转写或朗读接口的访问**。公开分享前需设置访问保护，避免他人消耗站点密钥额度。当前用量账本依赖单 Node.js 进程和持久磁盘；多实例或无持久磁盘环境需改为共享存储。详见 [服务与部署说明](docs/services-and-deployment.md)。
 
-## 已知限制
+## 项目文档
 
-- 自动翻译、注音和单字合成可能误判多音字，单字读音可能与句中不同；学习时需结合语境核对。
-- 自动转写可能漏字、幻觉或把粤语写成普通话；当前不是边录边转写，也没有说话人区分。
-- 暂无普通话拼音、单字释义、收藏和间隔复习。
-- 服务商模型和额度可能变化；翻译模型配置位于对应服务端路由中。
-
-## 版本与参考
-
-[v1.0 源码快照](https://github.com/Wendyadjn/its-time-to-save-your-CUND/tree/v1.0)：原版 UI，粤普翻译、粤拼学习、录音转译及 HiuGaai 朗读。
-
-- [Groq 语音转写文档](https://console.groq.com/docs/speech-to-text)
-- [Groq 额度与限速](https://console.groq.com/docs/rate-limits)
-- [Ondoku API 文档](https://ondoku3.com/en/developer/api/standard-tts.html)
-- [Ondoku 声线列表](https://ondoku3.com/en/developer/api/voices.html)
-
-## v1.1
-更改了UI，希望看起来比原本的好看了。但还是有点丑。
-
-## v1.2
-
-版本快照：**1.2.0**（Git 标签 `v1.2`）。
-
-界面与朗读：默认简体，移除开头装饰区，说明文字统一缩小；Ondoku 合成语速调整为 1 倍。
-
-当前交互更新：移除开头装饰区，直接进入功能；全文一次生成连贯音频，保留单句与单字播放；语音结果以颜色及状态文字区分成功、处理中和失败。录音与上传上限均为五分钟，录音剩余 30、10、5 秒时提醒，到时停止。音频仍受 10 MB 大小限制。
-
-转写校对：请求 Whisper 逐段时间与质量信息，不再发送可能被误转写的提示语。低置信度、疑似静音/重复、旧提示语混入或缺失质量信息的片段显示警示并暂停自动翻译，可定位原音复听；人工校对后可确认翻译。这些指标不能保证发现所有漏字或幻觉，机器结果统一标为待校对。
-
-## v1.3 · 服务与用量
-
-新增“服务与用量”页签，显示当前配置、各服务最近调用结果、今日尝试/成功/失败次数和本站每日上限。尚未调用显示“尚未调用”，本站次数与服务商额度分开显示，可跳转官方控制台核对。刷新面板只读取本站统计，不发起付费模型调用。状态是最近调用的结果，不是实时健康承诺。
-
-在页签上方可切换 Groq / 硅基流动，选择保存在当前浏览器中，作用于后续翻译和转写；朗读固定使用 Ondoku。切换服务不会清空已有文字，也不会绕过本站每日上限；进行中的请求会取消，但已发出的调用仍计数。
-
-`.env.local` 或部署环境中可设置下列全站上限，更新后重启服务。默认为：
-
-```dotenv
-DAILY_TRANSLATE_LIMIT=100
-DAILY_TRANSCRIBE_LIMIT=20
-DAILY_TTS_LIMIT=100
-DAILY_TTS_CHARACTER_LIMIT=10000
-```
-
-前面三项为请求尝试次数，最后一项为朗读请求输入字数；0 表示停用，非法值也按 0 处理。按香港时间每日重置，统计从启用 v1.3 开始，不追溯历史。限额在调用服务商之前预占；失败、取消或进程中断不退次数，避免重复消耗。服务商可能仍对失败/取消计费，本站次数不是官方账单，也不是金额预算。
-
-用量元数据持久保存于 `.data/service-usage.json`（已被 Git 忽略），保留最近七个使用日及各服务最近状态；不保存文本、录音、密钥或服务商原始错误。可用 `SERVICE_DATA_DIR` 指定可写持久目录。损坏/不可写时阻止新请求，避免限额失效。当前适用于单 Node.js 进程；多实例/无持久磁盘部署需改用共享数据库事务，不应依赖此文件实施全局额度。不要删除该目录以免清除用量。
-
-## v2.1 · 私有云端历史
-
-新增“历史记录”页签，支持邮箱注册、登录、搜索、分页、查看、载入工作区和确认删除。文字翻译与语音转写均可手动保存，包含机器转写原文、校对后的文字、译文及片段提示。
-
-原音默认不保存；勾选后才上传私有存储。刷新后可重新打开历史及原音。登录窗口在当前页面打开，登录本身不会保存内容。相同账号下，新增记录内容与所选原音完全一致时不重复新增，连续点击、并发请求和重试均受保护；升级前已有的重复记录不会自动删除。
-
-Supabase 为可选配置；未配置时仍可使用翻译、录音和朗读。按 [Supabase 配置指南](docs/supabase-setup.md) 设置 `SUPABASE_URL`、`SUPABASE_PUBLISHABLE_KEY`，执行 [数据库与私有存储脚本](supabase/migrations/20261110_history.sql)，并配置邮箱确认。公开连接信息会提供给浏览器，禁止使用 secret 或 service_role 密钥。记录及音频通过登录身份和行级权限隔离。
-
-历史接口：`GET /api/history`（列表或详情）、`POST /api/history`（保存）、`DELETE /api/history?id=…`（删除），均要求登录。音频沿用五分钟、10 MB、格式及真实时长校验。音频上传与数据库写入不是跨服务原子事务；失败时会尝试清理并提示，网络中断后应先检查历史再重试。删除会移除云端记录及原音，无法在网页恢复。
-
-新增文件：`src/components/cloud-history.tsx`（登录与保存）、`history-panel.tsx`（历史界面）、`src/app/api/history/route.ts`（账号隔离接口）、`src/lib/history.ts` 与 `cloud-config.ts`（校验）、`supabase/`（建表与权限验证脚本）。
-
-### 后续版本
-
-- v2.2：收藏与间隔复习，复用历史记录及账号。尚未实现。
-
-## v2.1.1 · 服务商额度来源
-
-“服务与用量”页将官方数据与本站每日上限分区显示：
-
-- **Groq**：保存真实翻译／转写响应中的额度头，按模型显示每日剩余请求、每分钟剩余 Token、采样时间及窗口重置时间。这是组织速率额度，不是付费余额；重置时间缺失或窗口到期后不再显示旧值为当前可用量。没有响应头时保持未知；换密钥后不显示旧账户数据。语音秒数等未返回的数据不推算。
-- **Ondoku**：标准 TTS API 没有公开剩余字数查询。面板提供官方账户入口，可将刚核对的剩余字数及下次更新日记录在当前浏览器。明确标为“手动核对快照”，不自动扣减、不自动补满，也不会同步给其他浏览器。到填写的更新日期会提醒重新核对。未注册试用和注册免费账户的月额度不同，以账户页为准。
-- **硅基流动国内站**：原 `/user/info` 余额查询已停用，不再调用；提供官方费用账单入口，不用请求次数估算余额。
-
-刷新面板不会调用收费模型或生成音频。本站文件账本只记录本服务器请求，不包含 Ondoku 官网或其他应用的消耗；不能用于还原服务商真实月账单。
-
-依据：[Ondoku 标准 API](https://ondoku3.com/en/developer/api/standard-tts.html)、[Ondoku 免费额度](https://ondoku3.com/en/about/)、[Groq 响应头](https://console.groq.com/docs/rate-limits)、[硅基流动接口停用公告](https://api-docs.siliconflow.cn/docs/release-notes/overview)。
+- [Supabase 配置与验证](docs/supabase-setup.md)：账号、数据库权限、私有原音存储。
+- [服务与部署说明](docs/services-and-deployment.md)：模型、额度来源、限额配置、接口及运行限制。
+- [更新记录](CHANGELOG.md)：已发布版本；收藏与间隔复习计划在 v2.2 实现，目前尚未提供。
