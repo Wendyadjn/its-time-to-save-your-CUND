@@ -1,5 +1,5 @@
 import { getAiService } from "../../../lib/ai-service";
-import { serviceUsage } from "../../../lib/service-usage";
+import { quotaKey, serviceUsage } from "../../../lib/service-usage";
 
 export const runtime = "nodejs";
 export async function GET() {
@@ -9,7 +9,8 @@ export async function GET() {
       const service = getAiService(id)!;
       return { id, name: service.name, configured: Boolean(service.key) };
     });
-    return Response.json({ ...usage, providers, defaultProvider: getAiService()?.id ?? "groq", ondokuConfigured: process.env.ONDOKU_TOKEN?.trim().length === 64, balance: "unknown" }, { headers: { "Cache-Control": "no-store" } });
+    const { groqQuota, ...localUsage } = usage;
+    return Response.json({ ...localUsage, groqQuota: Object.entries(groqQuota).map(([key, value]) => ({ model: key.slice(key.indexOf(":") + 1), ...value })), providers, defaultProvider: getAiService()?.id ?? "groq", ondokuConfigured: process.env.ONDOKU_TOKEN?.trim().length === 64, ondokuAccount: process.env.ONDOKU_TOKEN?.trim().length === 64 ? quotaKey(process.env.ONDOKU_TOKEN.trim()) : null, balance: "unknown" }, { headers: { "Cache-Control": "no-store" } });
   } catch {
     return Response.json({ error: "用量统计暂不可用，请检查服务器存储。" }, { status: 503, headers: { "Cache-Control": "no-store" } });
   }

@@ -1,12 +1,15 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { createHash } from "node:crypto";
+import { parseGroqQuota, type GroqQuota } from "./provider-quota";
 
 export type ServiceKind = "translate" | "transcribe" | "tts";
 export type ServiceProvider = "groq" | "siliconflow" | "ondoku";
 export type CallState = "success" | "network" | "auth" | "limited" | "timeout" | "failed" | "rejected" | "audio_unavailable";
 type Counter = { attempts: number; succeeded: number; failed: number; characters: number };
 type Latest = { startedAt: number; completedAt: number; state: CallState };
-type Ledger = { version: 1; days: Record<string, Record<string, Counter>>; latest: Record<string, Latest> };
+type Ledger = { version: 1; days: Record<string, Record<string, Counter>>; latest: Record<string, Latest>; groqQuota?: Record<string, GroqQuota> };
+export const quotaKey = (key: string) => createHash("sha256").update(key).digest("hex").slice(0, 24);
 const empty = (): Ledger => ({ version: 1, days: {}, latest: {} });
 const counter = (): Counter => ({ attempts: 0, succeeded: 0, failed: 0, characters: 0 });
 export const serviceDay = (now = Date.now()) => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Hong_Kong", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(now));
@@ -53,7 +56,15 @@ export function createUsageStore(directory: string) {
   return {
     snapshot: () => serial(async () => {
       const data = await read();
-      return { day: serviceDay(), counters: data.days[serviceDay()] ?? {}, latest: data.latest, limits: dailyLimits() };
+      return { day: serviceDay(), counters: data.days[serviceDay()] ?? {}, latest: data.latest, limits: dailyLimits(), groqQuota: Object.fromEntries(Object.entries(data.groqQuota ?? {}).filter(([key]) => key.startsWith(quotaKey(process.env.GROQ_API_KEY?.trim() ?? "") + ":"))) };
+    }),
+    recordGroqQuota: (apiKey: string, model: string, headers: Headers) => serial(async () => {
+      const quota = parseGroqQuota(headers); if (!quota) return;
+      const data = await read();
+      const prefix = quotaKey(apiKey) + ":";
+      data.groqQuota = Object.fromEntries(Object.entries(data.groqQuota ?? {}).filter(([key]) => key.startsWith(prefix)));
+      data.groqQuota[prefix + model] = quota;
+      await save(data);
     }),
     reserve: (kind: ServiceKind, provider: ServiceProvider, characters: number) => serial(async () => {
       const data = await read(), day = serviceDay(), limits = dailyLimits();

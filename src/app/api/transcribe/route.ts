@@ -1,4 +1,4 @@
-import { trackServiceCall } from "../../../lib/service-usage";
+import { serviceUsage, trackServiceCall } from "../../../lib/service-usage";
 import { getAiService } from "../../../lib/ai-service";
 import { reviewTranscription } from "../../../lib/transcription";
 import { hasAudioSignature, MAX_AUDIO_BYTES, validateAudio } from "../../../lib/audio";
@@ -70,6 +70,7 @@ export async function POST(request: Request) {
       method: "POST", headers: { Authorization: `Bearer ${key}` }, body: form,
       signal: AbortSignal.any([request.signal, AbortSignal.timeout(60_000)]), cache: "no-store",
     });
+    if (service.id === "groq") await serviceUsage().recordGroqQuota(service.key!, service.speechModel, response.headers).catch(() => {});
     if (!response.ok) {
       if (service.id === "siliconflow") return failure(response.status === 429 ? "硅基流动语音额度或速率达到上限，请稍后重试。" : response.status === 401 || response.status === 403 ? "硅基流动拒绝语音请求，请检查 SILICONFLOW_API_KEY、网络及模型访问权限。" : "硅基流动无法完成转写，请检查音频格式后重试。", response.status === 429 ? 429 : 502);
       if (response.status === 429) return failure("Groq 语音免费额度或速率达到上限，请稍后重试。", 429);

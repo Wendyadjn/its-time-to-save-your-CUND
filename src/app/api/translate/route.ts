@@ -1,4 +1,4 @@
-import { trackServiceCall } from "../../../lib/service-usage";
+import { serviceUsage, trackServiceCall } from "../../../lib/service-usage";
 import { getAiService } from "../../../lib/ai-service";
 import { MAX_LENGTH, type Direction } from "../../../lib/translation";
 
@@ -78,6 +78,7 @@ export async function POST(request: Request) {
       signal: AbortSignal.any([request.signal, AbortSignal.timeout(30_000)]),
       cache: "no-store",
     });
+    if (service.id === "groq") await serviceUsage().recordGroqQuota(apiKey, service.translationModel, upstream.headers).catch(() => {});
     if (!upstream.ok) {
       if (service.id === "siliconflow") return failure(upstream.status === 429 ? "硅基流动额度或速率达到上限，请稍后重试。" : upstream.status === 401 || upstream.status === 403 ? "硅基流动拒绝请求，请检查 SILICONFLOW_API_KEY、网络及模型访问权限。" : "硅基流动翻译暂不可用，请稍后重试。", upstream.status === 429 ? 429 : 502);
       if (upstream.status === 429) return failure("Groq 免费额度或速率达到上限，请稍后重试，并在控制台查看额度。", 429);

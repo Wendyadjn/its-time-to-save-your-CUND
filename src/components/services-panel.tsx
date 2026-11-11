@@ -1,11 +1,14 @@
 "use client";
 import { useEffect, useState } from "react";
+import ProviderQuotas from "./provider-quotas";
+import type { GroqQuota } from "@/lib/provider-quota";
 
 type Counter = { attempts: number; succeeded: number; failed: number; characters: number };
 type Snapshot = {
   day: string; counters: Record<string, Counter>; latest: Record<string, { state: string; completedAt: number }>;
   limits: { translate: number; transcribe: number; tts: number; ttsCharacters: number };
   providers: { id: string; name: string; configured: boolean }[]; ondokuConfigured: boolean;
+  groqQuota: (GroqQuota & { model: string })[]; ondokuAccount: string | null;
 };
 const labels: Record<string, string> = { success: "最近调用成功", rejected: "请求被拒绝，请检查连接及权限", audio_unavailable: "音频未生成，请检查账户额度", network: "网络连接被拒绝或失败", auth: "认证或权限异常", limited: "服务商额度或速率受限", timeout: "最近调用超时", failed: "最近调用失败，请查看操作提示" };
 const services = [{ id: "translate", name: "文本翻译" }, { id: "transcribe", name: "语音转写" }, { id: "tts", name: "粤语朗读" }] as const;
@@ -33,9 +36,11 @@ export default function ServicesPanel({ provider }: { provider: string }) {
   }, []);
   return <section className="services-panel" aria-label="服务与用量">
     <div className="services-heading"><h2>服务与用量</h2><button type="button" disabled={loading} onClick={() => window.dispatchEvent(new Event("services-refresh"))}>{loading ? "读取中…" : "刷新状态"}</button></div>
-    <p className="service-help">显示本站最近调用结果，不会为检查状态生成文字或音频。服务商真实剩余额度：未知。</p>
+    <p className="service-help">官方额度、手动核对记录与本站统计分别显示，并注明数据来源和更新时间。</p>
     {error && <p role="alert" className="error">{error}</p>}
     {data && <>
+      <ProviderQuotas groqQuota={data.groqQuota ?? []} ondokuAccount={data.ondokuAccount ?? null} ondokuIssue={data.latest["tts:ondoku"]?.state === "audio_unavailable"} />
+      <h3>本站每日上限</h3>
       <p className="service-help">{data.day} · 香港时间每日重置 · 以下为本服务器所有使用者的合计用量</p>
       <div className="service-grid">{services.map(service => {
         const used = Object.entries(data.counters).filter(([key]) => key.startsWith(service.id + ":")).reduce((sum, [, row]) => sum + row.attempts, 0);
