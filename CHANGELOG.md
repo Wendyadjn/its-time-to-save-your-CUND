@@ -1,5 +1,12 @@
 # 更新记录
 
+## [v2.4](https://github.com/Wendyadjn/its-time-to-save-your-CUND/tree/v2.4) · 启动器预览
+
+- 增加 Mac、Windows 和 Linux 入口与共享生产启动器。
+- 无合适 Node 时下载固定运行时并核对哈希；依赖、构建按内容缓存。
+- 本机监听、端口避让、同目录实例检查与非计费健康检查。
+- 保留已有配置和用量；Windows、无 Node 引导及干净设备仍待验证。
+
 ## [v2.3](https://github.com/Wendyadjn/its-time-to-save-your-CUND/tree/v2.3)
 
 - 固定直接依赖为当前 lockfile 的确切版本，声明 Node.js 22 及以上要求。

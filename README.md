@@ -2,7 +2,7 @@
 
 用于粤语学习的 Web 应用，支持粤普双向翻译、粤拼标注、互动朗读和录音转写，并可将学习内容保存到私有云端历史。
 
-当前版本：[v2.3](https://github.com/Wendyadjn/its-time-to-save-your-CUND/tree/v2.3) · [更新记录](CHANGELOG.md)
+当前版本：[v2.4](https://github.com/Wendyadjn/its-time-to-save-your-CUND/tree/v2.4)（启动器预览） · [更新记录](CHANGELOG.md)
 
 ## 功能
 
@@ -16,6 +16,8 @@
 | 服务与用量 | 切换 Groq / 硅基流动，查看调用状态、本站每日上限和可获取的官方额度信息 |
 
 ## 本地运行
+
+新增双击入口：macOS 使用 `Start.command`，Windows x64 使用 `Start.cmd`。首次自动准备环境；详细步骤与尚未验证的平台见 [本地启动指南](docs/local-start.md)。下面保留手动启动方式。
 
 需要 **Node.js 22 或以上**、npm。首次下载并启动：
 
