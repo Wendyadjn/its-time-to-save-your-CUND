@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AudioLines, Mic, Square, Upload, X } from "lucide-react";
+import { SaveHistory } from "./cloud-history";
+import type { HistoryItem } from "@/lib/history";
 import JyutpingText from "./jyutping-text";
 import { AUDIO_ACCEPT, MAX_AUDIO_BYTES, MAX_RECORD_SECONDS, recordingExtension, recordingReminder, validateAudio } from "@/lib/audio";
 import { convertScript, MAX_LENGTH, resolveScript, type Script } from "@/lib/translation";
@@ -9,21 +11,23 @@ import { convertScript, MAX_LENGTH, resolveScript, type Script } from "@/lib/tra
 import { playAudioSegment } from "@/lib/audio-segment";
 import type { TranscriptSegment } from "@/lib/transcription";
 
-export default function VoiceRecorder({ script, serviceName = "Groq", provider }: { script: Script; serviceName?: string; provider?: string }) {
+export default function VoiceRecorder({ script, serviceName = "Groq", provider, initialHistory }: { script: Script; serviceName?: string; provider?: string; initialHistory?: HistoryItem }) {
   const [status, setStatus] = useState<"idle" | "requesting" | "recording" | "transcribing" | "translating">("idle");
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState("");
   const [seconds, setSeconds] = useState(0);
-  const [segments, setSegments] = useState<TranscriptSegment[]>([]);
+  const [segments, setSegments] = useState<TranscriptSegment[]>(initialHistory?.segments ?? []);
   const stopReplay = useRef<(() => void) | null>(null);
   const originalAudio = useRef<HTMLAudioElement>(null);
   const needsReview = segments.some(segment => segment.issue);
-  const [transcript, setTranscript] = useState("");
-  const [translation, setTranslation] = useState("");
+  const [transcript, setTranscript] = useState(initialHistory?.sourceText ?? "");
+  const [originalText, setOriginalText] = useState(initialHistory?.originalText ?? "");
+  const [recordProvider, setRecordProvider] = useState(initialHistory?.provider ?? "unknown");
+  const [translation, setTranslation] = useState(initialHistory?.resultText ?? "");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [transcriptState, setTranscriptState] = useState("idle");
-  const [translationState, setTranslationState] = useState("idle");
+  const [transcriptState, setTranscriptState] = useState(initialHistory ? "edited" : "idle");
+  const [translationState, setTranslationState] = useState(initialHistory?.resultText ? "success" : "idle");
   const cutoff = useRef<ReturnType<typeof setTimeout> | null>(null);
   const recorder = useRef<MediaRecorder | null>(null);
   const stream = useRef<MediaStream | null>(null);
@@ -66,12 +70,24 @@ export default function VoiceRecorder({ script, serviceName = "Groq", provider }
     return () => URL.revokeObjectURL(url);
   }, [file]);
 
+  useEffect(() => {
+    if (!initialHistory?.audioUrl) return;
+    const controller = new AbortController();
+    void fetch(initialHistory.audioUrl, { signal: controller.signal }).then(async response => {
+      if (!response.ok) throw new Error("原音地址已失效，请从历史记录重新打开。");
+      const blob = await response.blob();
+      if (blob.size > MAX_AUDIO_BYTES) throw new Error("历史原音超过大小限制。");
+      if (!controller.signal.aborted) setFile(new File([blob], initialHistory.audioName || "history.webm", { type: blob.type }));
+    }).catch(cause => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : "历史原音读取失败，文字仍保留。"); });
+    return () => controller.abort();
+  }, [initialHistory?.id, initialHistory?.audioUrl]);
+
   function chooseFile(value: File) {
     const invalid = validateAudio(value);
     if (invalid) { setError(invalid); return; }
     stopReplay.current?.();
     setTranscriptState("idle"); setTranslationState("idle");
-    setSegments([]); setSeconds(0); setFile(value); setTranscript(""); setTranslation(""); setError(""); setNotice("");
+    setOriginalText(""); setRecordProvider("unknown"); setSegments([]); setSeconds(0); setFile(value); setTranscript(""); setTranslation(""); setError(""); setNotice("");
   }
 
   function cancel() {
@@ -156,7 +172,7 @@ export default function VoiceRecorder({ script, serviceName = "Groq", provider }
         if (request.current !== controller) return;
         if (!response.ok) throw new Error(typeof data.error === "string" ? data.error : "语音转写失败。");
         if (typeof data.text !== "string" || !data.text.trim()) throw new Error("未识别到有效文字。");
-        recognized = data.text; setTranscript(recognized);
+        recognized = data.text; setTranscript(recognized); setOriginalText(recognized); setRecordProvider(provider ?? (serviceName === "硅基流动" ? "siliconflow" : "groq"));
         const reviewed: TranscriptSegment[] = Array.isArray(data.segments) && data.segments.length ? data.segments : [{ text: recognized, start: null, end: null, issue: "缺少片段信息，请复听校对" }];
         setSegments(reviewed); setTranscriptState("review");
         if (reviewed.some(segment => segment.issue)) {
@@ -176,7 +192,7 @@ export default function VoiceRecorder({ script, serviceName = "Groq", provider }
       if (request.current !== controller) return;
       if (!response.ok) throw new Error(typeof data.error === "string" ? data.error : "普通话翻译失败，可保留转写后重试。");
       if (typeof data.translation !== "string" || !data.translation.trim()) throw new Error("翻译返回了无效文本，请重试。");
-      setTranslation(data.translation); setTranslationState("success"); setNotice("机器转写与翻译已生成，请对照原音校对。");
+      setTranslation(data.translation); setRecordProvider(provider ?? (serviceName === "硅基流动" ? "siliconflow" : "groq")); setTranslationState("success"); setNotice("机器转写与翻译已生成，请对照原音校对。");
     } catch (cause) {
       if (request.current === controller) {
         if (recognized.trim()) setTranslationState("error"); else setTranscriptState("error");
@@ -219,6 +235,7 @@ export default function VoiceRecorder({ script, serviceName = "Groq", provider }
       </section>
       <section className={`result-card result-${translationState}`}><h3>普通话翻译 <small>{translationState === "success" ? "✓ 已翻译" : translationState === "error" ? "翻译失败 · 粤语原文已保留" : translationState === "blocked" ? "转写待校对 · 已暂停翻译" : translationState === "pending" ? "正在翻译" : "待翻译"}</small></h3>{translation ? <p className="voice-translation" lang="zh-CN">{convertScript(translation, resolved)}</p> : <p className="voice-help">{translationState === "blocked" ? "存在疑似未识别的片段，请先复听并校对左侧原文，避免将猜测当作译文。" : translationState === "error" ? "翻译未完成。左侧粤语原文已保留，可校对后点击“翻译普通话”重试。" : "转写完成后自动翻译；翻译失败时仍保留粤语原文。"}</p>}</section>
     </div>
-    <p className="mode-notice">自动转写可能漏字、误识别或将粤语写成普通话，请对照原音校对。本页不自动保存音频或转写，离开标签页后会清除。</p>
+    {transcript.trim() && <SaveHistory disabled={busy || recording} audio={file} draft={{ kind: "voice", title: Array.from(transcript.trim().split("\n")[0]).slice(0, 60).join(""), direction: "cantonese-mandarin", sourceText: transcript, originalText, resultText: translation, provider: recordProvider, script, segments }} />}
+    <p className="mode-notice">自动转写可能漏字、误识别或将粤语写成普通话，请对照原音校对。仅点击“保存到历史”才会云端留存；未保存的内容离开标签页后清除。</p>
   </div>;
 }

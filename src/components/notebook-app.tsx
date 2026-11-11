@@ -4,6 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowDownUp, ArrowRight, AudioLines, BookOpen, Check, Copy, Languages, Mic, Sparkles } from "lucide-react";
 import JyutpingText from "@/components/jyutping-text";
+import HistoryPanel from "@/components/history-panel";
+import { SaveHistory, useCloudHistory } from "@/components/cloud-history";
+import type { HistoryItem } from "@/lib/history";
 import ServicesPanel from "@/components/services-panel";
 import VoiceRecorder from "@/components/voice-recorder";
 import { convertScript, examples, resolveScript, translateDemo, type Script } from "@/lib/translation";
@@ -17,26 +20,38 @@ const concepts = [
 
 export default function NotebookApp({ preview = false, serviceName = "Groq" }: { preview?: boolean; serviceName?: string }) {
   const [concept, setConcept] = useState(2);
+  const cloud = useCloudHistory();
+  const lastUser = useRef<string | null>(null);
   const [provider, setProvider] = useState(serviceName === "硅基流动" ? "siliconflow" : "groq");
   const activeServiceName = provider === "siliconflow" ? "硅基流动" : "Groq";
   useEffect(() => { try { const value = localStorage.getItem("canto-provider"); if (value === "groq" || value === "siliconflow") setProvider(value); } catch {} }, []);
-  const [tab, setTab] = useState<"text" | "voice" | "services">("text");
+  const [tab, setTab] = useState<"text" | "voice" | "services" | "history">("text");
   const [script, setScript] = useState<Script>("simplified");
   const [reverse, setReverse] = useState(false);
   const [input, setInput] = useState<string>(examples[3].mandarin);
   const [result, setResult] = useState<string>(examples[3].cantonese);
+  const [resultProvider, setResultProvider] = useState("demo");
+  const [voiceHistory, setVoiceHistory] = useState<HistoryItem | null>(null);
   const [message, setMessage] = useState("");
   const [mode, setMode] = useState<"demo" | "api">("demo");
   const [loading, setLoading] = useState(false);
   const [outputScript, setOutputScript] = useState<"simplified" | "traditional" | null>(null);
   const request = useRef<AbortController | null>(null);
   useEffect(() => () => { request.current?.abort(); request.current = null; }, []);
+  useEffect(() => {
+    const id = cloud.user?.id ?? null;
+    if (lastUser.current && lastUser.current !== id) {
+      request.current?.abort(); request.current = null; setLoading(false);
+      setInput(""); setResult(""); setVoiceHistory(null); setMessage(""); setTab("history");
+    }
+    lastUser.current = id;
+  }, [cloud.user?.id]);
   function cancel() { request.current?.abort(); request.current = null; setLoading(false); }
   function edit(value: string) { cancel(); setInput(value); setResult(""); setMessage(""); setOutputScript(null); }
   async function translate() {
     cancel(); setMessage(""); setResult(""); setOutputScript(null);
     if (mode === "demo") {
-      try { setResult(translateDemo(input, reverse ? "cantonese-mandarin" : "mandarin-cantonese")); }
+      try { setResult(translateDemo(input, reverse ? "cantonese-mandarin" : "mandarin-cantonese")); setResultProvider("demo"); }
       catch(error) { setMessage(error instanceof Error ? error.message : "翻译失败，请重试。"); }
       return;
     }
@@ -48,7 +63,7 @@ export default function NotebookApp({ preview = false, serviceName = "Groq" }: {
       if (request.current !== controller) return;
       if (!response.ok) throw new Error(typeof data.error === "string" ? data.error : "翻译失败，请重试。");
       if (typeof data.translation !== "string" || !data.translation.trim()) throw new Error("服务返回的译文无效。");
-      setResult(data.translation); setMessage("翻译完成，请核对语义和读音。");
+      setResult(data.translation); setResultProvider(provider); setMessage("翻译完成，请核对语义和读音。");
     } catch(error) {
       if (request.current === controller) setMessage(controller.signal.aborted ? "翻译请求超时，请重试。" : error instanceof Error ? error.message : "无法连接翻译服务。");
     } finally { window.clearTimeout(timeout); if (request.current === controller) { request.current = null; setLoading(false); } }
@@ -66,7 +81,12 @@ export default function NotebookApp({ preview = false, serviceName = "Groq" }: {
     const example = examples[index];
     setInput(reverse ? example.cantonese : example.mandarin);
     setResult(reverse ? example.mandarin : example.cantonese);
-    setMessage("");
+    setMessage(""); setResultProvider("demo");
+  }
+  function restoreHistory(item: HistoryItem) {
+    cancel(); setScript(item.script); setMessage("已载入历史。编辑后保存为新记录。");
+    if (item.kind === "voice") { setVoiceHistory(item); setTab("voice"); }
+    else { setInput(item.sourceText); setResult(item.resultText); setResultProvider(item.provider); setReverse(item.direction === "cantonese-mandarin"); setOutputScript(null); setTab("text"); }
   }
 
   return <div className={`${styles.lab} ${!preview ? styles.live : ""}`}>
@@ -84,17 +104,18 @@ export default function NotebookApp({ preview = false, serviceName = "Groq" }: {
 
       <div className={styles.body}>
         <aside className={styles.rail}><span>OC / 01</span><div>听 · 读 · 讲</div><small>TEXT / AUDIO</small></aside>
-        <nav className={styles.nav} aria-label="学习方式"><div><button aria-pressed={tab === "text"} onClick={() => { cancel(); setTab("text"); }}><Languages size={17}/><span>{concept === 1 ? "01 / TEXT TRACK" : "文本翻译"}</span></button><button aria-pressed={tab === "voice"} onClick={() => { cancel(); setTab("voice"); }}><Mic size={17}/><span>{concept === 1 ? "02 / VOICE TRACK" : "语音转译"}</span></button><button aria-pressed={tab === "services"} onClick={() => { cancel(); setTab("services"); }}>服务与用量</button></div><span>{tab === "text" ? "双向翻译 · 简繁转换" : tab === "voice" ? "语音转译" : "调用状态 · 本站每日上限"}</span></nav>
+        <nav className={styles.nav} aria-label="学习方式"><div><button aria-pressed={tab === "text"} onClick={() => { cancel(); setTab("text"); }}><Languages size={17}/><span>{concept === 1 ? "01 / TEXT TRACK" : "文本翻译"}</span></button><button aria-pressed={tab === "voice"} onClick={() => { cancel(); setVoiceHistory(null); setTab("voice"); }}><Mic size={17}/><span>{concept === 1 ? "02 / VOICE TRACK" : "语音转译"}</span></button><button aria-pressed={tab === "services"} onClick={() => { cancel(); setTab("services"); }}>服务与用量</button><button aria-pressed={tab === "history"} onClick={() => { cancel(); setTab("history"); }}>历史记录</button></div><span>{tab === "text" ? "双向翻译 · 简繁转换" : tab === "voice" ? "语音转译" : tab === "services" ? "调用状态 · 本站每日上限" : "私有记录 · 云端同步"}</span></nav>
 
         <div className={styles.modeBar}><label>翻译与转写服务<select aria-label="翻译与转写服务" value={provider} onChange={event => { cancel(); const value = event.target.value; setProvider(value); try { localStorage.setItem("canto-provider", value); } catch {} setMessage("已切换服务，已有文字仍保留。"); }}><option value="groq">Groq</option><option value="siliconflow">硅基流动（备用）</option></select></label><small>文字和录音发送至当前选择的服务；朗读使用 Ondoku。</small></div>
-        {tab === "services" ? <ServicesPanel provider={provider} /> : <>
+        {tab === "history" ? <HistoryPanel onOpen={restoreHistory} /> : tab === "services" ? <ServicesPanel provider={provider} /> : <>
         {!preview && tab === "text" && <div className={styles.modeBar}><label>翻译方式<select aria-label="翻译方式" value={mode} onChange={event => { cancel(); setMode(event.target.value as "demo" | "api"); setResult(""); setMessage(""); }}><option value="demo">本地例句演示</option><option value="api">{activeServiceName} AI 翻译</option></select></label><small>{mode === "api" ? `翻译文字会发送至 ${activeServiceName}，使用账户额度。` : "演示支持下方例句及其组合；自由文本请选择 AI 翻译。"}</small></div>}
         <section className={styles.workspace} aria-label={tab === "text" ? "文本翻译" : "语音转译"}>
           {tab === "text" ? <>
             <div className={styles.inputCard}><div className={styles.cardTop}><span><b>01</b> {reverse ? "粤语原文" : "普通话原文"}</span><small>INPUT</small></div><label className="sr-only" htmlFor="demo-input">输入原文</label><textarea id="demo-input" value={convertScript(input, resolved)} onChange={event => edit(event.target.value)} /><div className={styles.inputBottom}><span>{Array.from(input).length} / 3000</span><div><button onClick={paste}>粘贴</button><button disabled={!input} onClick={() => edit("")}>清空</button></div></div>{reverse && input.trim() && Array.from(input).length <= 3000 && <JyutpingText key={`input-${input}`} text={convertScript(input,resolved)} />}<div className={styles.translateActions}><button className={styles.swap} aria-label="交换翻译方向" onClick={() => { cancel(); setReverse(!reverse); edit(result ? output : ""); }}><ArrowDownUp size={18}/></button><button className={styles.translate} disabled={loading || !input.trim() || Array.from(input).length > 3000} onClick={translate}>{loading ? "翻译中…" : "翻译这句话"} <ArrowRight size={17}/></button></div></div>
             <div className={styles.outputCard}><div className={styles.cardTop}><span><b>02</b> {reverse ? "普通话表达" : "粤语白话"}</span><button disabled={!result} onClick={() => setOutputScript((outputScript ?? resolved) === "traditional" ? "simplified" : "traditional")}>简 / 繁</button><button disabled={!result} aria-label="复制译文" onClick={async () => {try {await navigator.clipboard.writeText(output);setMessage("已复制译文");}catch {setMessage("请选中译文手动复制。");}}}><Copy size={15}/></button></div>{result ? <><p className={styles.translation}>{output}</p><div className={styles.annotationLabel}><AudioLines size={15}/> {reverse ? "普通话译文" : "粤拼与发音"}</div>{!reverse && <JyutpingText key={output} text={output}/>}</> : <div className={styles.empty}><Sparkles size={30}/><p>{loading ? "正在生成译文…" : "翻译结果将在此显示。"}</p></div>}</div>
-          </> : <div className={styles.voice}><VoiceRecorder script={script} serviceName={activeServiceName} provider={provider}/></div>}
+          </> : <div className={styles.voice}><VoiceRecorder key={voiceHistory?.id ?? "new"} initialHistory={voiceHistory ?? undefined} script={script} serviceName={activeServiceName} provider={provider}/></div>}
         </section>
+        {tab === "text" && input.trim() && <SaveHistory disabled={loading} draft={{ kind: "text", title: Array.from(input.trim().split("\n")[0]).slice(0, 60).join(""), sourceText: input, originalText: "", resultText: result, direction: reverse ? "cantonese-mandarin" : "mandarin-cantonese", provider: result ? resultProvider : "unknown", script, segments: [] }} />}
         <p className={styles.feedback} role="status">{message}</p>
         {tab === "text" && <section className={styles.examples}><div className={styles.examplesTitle}><span>{concept === 0 ? "日常切片" : concept === 1 ? "QUICK SAMPLES" : "常用例句"}</span><small>点击任意卡片试用 <ArrowRight size={13}/></small></div><div className={styles.exampleGrid}>{examples.map((example,index) => <button key={example.label} onClick={() => loadExample(index)}><span className={styles.exampleNumber}>0{index+1} <small>{example.label}</small></span><strong>{convertScript(example.cantonese,resolved)}</strong><span>{example.mandarin}</span><ArrowRight size={17}/></button>)}</div></section>}
         </>}
