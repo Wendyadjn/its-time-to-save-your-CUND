@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowDownUp, ArrowRight, AudioLines, BookOpen, Check, Copy, Languages, Mic, Sparkles } from "lucide-react";
+import CantoneseReader from "@/components/cantonese-reader";
 import JyutpingText from "@/components/jyutping-text";
 import HistoryPanel from "@/components/history-panel";
 import { SaveHistory, useCloudHistory } from "@/components/cloud-history";
@@ -25,7 +26,8 @@ export default function NotebookApp({ preview = false, serviceName = "Groq" }: {
   const [provider, setProvider] = useState(serviceName === "硅基流动" ? "siliconflow" : "groq");
   const activeServiceName = provider === "siliconflow" ? "硅基流动" : "Groq";
   useEffect(() => { try { const value = localStorage.getItem("canto-provider"); if (value === "groq" || value === "siliconflow") setProvider(value); } catch {} }, []);
-  const [tab, setTab] = useState<"text" | "voice" | "services" | "history">("text");
+  const [tab, setTab] = useState<"text" | "read" | "voice" | "services" | "history">("text");
+  const [readerText, setReaderText] = useState("");
   const [script, setScript] = useState<Script>("simplified");
   const [reverse, setReverse] = useState(false);
   const [input, setInput] = useState<string>(examples[3].mandarin);
@@ -42,7 +44,7 @@ export default function NotebookApp({ preview = false, serviceName = "Groq" }: {
     const id = cloud.user?.id ?? null;
     if (lastUser.current && lastUser.current !== id) {
       request.current?.abort(); request.current = null; setLoading(false);
-      setInput(""); setResult(""); setVoiceHistory(null); setMessage(""); setTab("history");
+      setInput(""); setResult(""); setReaderText(""); setVoiceHistory(null); setMessage(""); setTab("history");
     }
     lastUser.current = id;
   }, [cloud.user?.id]);
@@ -104,10 +106,10 @@ export default function NotebookApp({ preview = false, serviceName = "Groq" }: {
 
       <div className={styles.body}>
         <aside className={styles.rail}><span>OC / 01</span><div>听 · 读 · 讲</div><small>TEXT / AUDIO</small></aside>
-        <nav className={styles.nav} aria-label="学习方式"><div><button aria-pressed={tab === "text"} onClick={() => { cancel(); setTab("text"); }}><Languages size={17}/><span>{concept === 1 ? "01 / TEXT TRACK" : "文本翻译"}</span></button><button aria-pressed={tab === "voice"} onClick={() => { cancel(); setVoiceHistory(null); setTab("voice"); }}><Mic size={17}/><span>{concept === 1 ? "02 / VOICE TRACK" : "语音转译"}</span></button><button aria-pressed={tab === "services"} onClick={() => { cancel(); setTab("services"); }}>服务与用量</button><button aria-pressed={tab === "history"} onClick={() => { cancel(); setTab("history"); }}>历史记录</button></div><span>{tab === "text" ? "双向翻译 · 简繁转换" : tab === "voice" ? "语音转译" : tab === "services" ? "调用状态 · 本站每日上限" : "私有记录 · 云端同步"}</span></nav>
+        <nav className={styles.nav} aria-label="学习方式"><div><button aria-pressed={tab === "text"} onClick={() => { cancel(); setTab("text"); }}><Languages size={17}/><span>{concept === 1 ? "01 / TEXT TRACK" : "文本翻译"}</span></button><button aria-pressed={tab === "read"} onClick={() => { cancel(); setTab("read"); }}><AudioLines size={17}/><span>粤语朗读</span></button><button aria-pressed={tab === "voice"} onClick={() => { cancel(); setVoiceHistory(null); setTab("voice"); }}><Mic size={17}/><span>{concept === 1 ? "02 / VOICE TRACK" : "语音转译"}</span></button><button aria-pressed={tab === "services"} onClick={() => { cancel(); setTab("services"); }}>服务与用量</button><button aria-pressed={tab === "history"} onClick={() => { cancel(); setTab("history"); }}>历史记录</button></div><span>{tab === "text" ? "双向翻译 · 简繁转换" : tab === "read" ? "粤拼标注 · 段落朗读" : tab === "voice" ? "语音转译" : tab === "services" ? "调用状态 · 本站每日上限" : "私有记录 · 云端同步"}</span></nav>
 
-        <div className={styles.modeBar}><label>翻译与转写服务<select aria-label="翻译与转写服务" value={provider} onChange={event => { cancel(); const value = event.target.value; setProvider(value); try { localStorage.setItem("canto-provider", value); } catch {} setMessage("已切换服务，已有文字仍保留。"); }}><option value="groq">Groq</option><option value="siliconflow">硅基流动（备用）</option></select></label><small>文字和录音发送至当前选择的服务；朗读使用 Ondoku。</small></div>
-        {tab === "history" ? <HistoryPanel onOpen={restoreHistory} /> : tab === "services" ? <ServicesPanel provider={provider} /> : <>
+        {tab !== "read" && <div className={styles.modeBar}><label>翻译与转写服务<select aria-label="翻译与转写服务" value={provider} onChange={event => { cancel(); const value = event.target.value; setProvider(value); try { localStorage.setItem("canto-provider", value); } catch {} setMessage("已切换服务，已有文字仍保留。"); }}><option value="groq">Groq</option><option value="siliconflow">硅基流动（备用）</option></select></label><small>文字和录音发送至当前选择的服务；朗读使用 Ondoku。</small></div>}
+        {tab === "read" ? <CantoneseReader text={readerText} onChange={setReaderText} script={script} key={script} /> : tab === "history" ? <HistoryPanel onOpen={restoreHistory} /> : tab === "services" ? <ServicesPanel provider={provider} /> : <>
         {!preview && tab === "text" && <div className={styles.modeBar}><label>翻译方式<select aria-label="翻译方式" value={mode} onChange={event => { cancel(); setMode(event.target.value as "demo" | "api"); setResult(""); setMessage(""); }}><option value="demo">本地例句演示</option><option value="api">{activeServiceName} AI 翻译</option></select></label><small>{mode === "api" ? `翻译文字会发送至 ${activeServiceName}，使用账户额度。` : "演示支持下方例句及其组合；自由文本请选择 AI 翻译。"}</small></div>}
         <section className={styles.workspace} aria-label={tab === "text" ? "文本翻译" : "语音转译"}>
           {tab === "text" ? <>

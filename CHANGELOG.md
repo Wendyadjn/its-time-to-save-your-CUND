@@ -1,5 +1,12 @@
 # 更新记录
 
+## [v2.2](https://github.com/Wendyadjn/its-time-to-save-your-CUND/tree/v2.2)
+
+- 新增独立“粤语朗读”页签，直接输入粤语段落显示粤拼，不调用翻译服务。
+- 复用全文、单句、单字发音及倍速控制，支持简繁切换、粘贴、清空与复制，最多 12,000 字。
+- 切换页签保留输入，退出或切换账号时清除工作区。
+- 取消原收藏与间隔复习计划，本版本不包含这些功能。
+
 ## [v2.1.1](https://github.com/Wendyadjn/its-time-to-save-your-CUND/tree/v2.1.1)
 
 - 将服务商额度与本站每日上限分区展示。
