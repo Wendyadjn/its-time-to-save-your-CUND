@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AudioLines, Mic, Square, Upload, X } from "lucide-react";
+import { useServiceCapabilities } from "./service-capabilities";
 import { SaveHistory } from "./cloud-history";
 import type { HistoryItem } from "@/lib/history";
 import JyutpingText from "./jyutping-text";
@@ -12,6 +13,8 @@ import { playAudioSegment } from "@/lib/audio-segment";
 import type { TranscriptSegment } from "@/lib/transcription";
 
 export default function VoiceRecorder({ script, serviceName = "Groq", provider, initialHistory }: { script: Script; serviceName?: string; provider?: string; initialHistory?: HistoryItem }) {
+  const capabilities = useServiceCapabilities();
+  const aiAvailable = (provider ?? (serviceName === "硅基流动" ? "siliconflow" : "groq")) === "siliconflow" ? capabilities.siliconflow : capabilities.groq;
   const [status, setStatus] = useState<"idle" | "requesting" | "recording" | "transcribing" | "translating">("idle");
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState("");
@@ -157,6 +160,7 @@ export default function VoiceRecorder({ script, serviceName = "Groq", provider, 
   }
 
   async function processAudio(translateOnly = false) {
+    if (!aiAvailable) { setError("当前转写与翻译服务未配置，仍可录音、上传并本地试听。"); return; }
     if (!translateOnly && !file) return;
     setError(""); setNotice(""); setTranslation(""); setTranslationState("idle");
     if (!translateOnly) { setTranscript(""); setSegments([]); }
@@ -216,8 +220,9 @@ export default function VoiceRecorder({ script, serviceName = "Groq", provider, 
       </div>
       {status === "recording" && seconds > 0 && recordingReminder(seconds) && <p role="status" aria-live="assertive" className="record-warning">{recordingReminder(seconds)}</p>}
       <label className={`audio-upload ${busy || recording ? "is-disabled" : ""}`}><Upload size={21} /><strong>选择音频文件</strong><small>MP3 · WAV · M4A · WebM · OGG，最长 5 分钟，最大 10 MB</small><input type="file" accept={AUDIO_ACCEPT} disabled={busy || recording} onChange={event => { const value = event.target.files?.[0]; if (value) chooseFile(value); event.target.value = ""; }} /></label>
+      {!aiAvailable && <p className="service-help">当前服务未配置。录音与文件试听仍可本地使用，转写和翻译需配置所选服务。</p>}
       <small>录音与上传均不超过 5 分钟；音频与转写文字会发送至 {serviceName}，使用账户额度。</small>
-      {file && <div className="audio-preview"><strong>{file.name}</strong><small>{(file.size / 1024 / 1024).toFixed(2)} MB</small>{preview && <audio ref={originalAudio} key={preview} controls src={preview} preload="metadata" />}<button className="primary" disabled={busy || recording} onClick={() => processAudio()}>{status === "transcribing" ? "正在转写…" : status === "translating" ? "正在翻译…" : "开始转写并翻译"}</button></div>}
+      {file && <div className="audio-preview"><strong>{file.name}</strong><small>{(file.size / 1024 / 1024).toFixed(2)} MB</small>{preview && <audio ref={originalAudio} key={preview} controls src={preview} preload="metadata" />}<button className="primary" disabled={!aiAvailable || busy || recording} onClick={() => processAudio()}>{status === "transcribing" ? "正在转写…" : status === "translating" ? "正在翻译…" : "开始转写并翻译"}</button></div>}
     </div>
     <p role="alert" className={error ? "feedback error" : "sr-only"}>{error}</p>
     <p role="status" className={`feedback ${needsReview ? "error" : ""}`}>{busy ? (status === "transcribing" ? "正在识别粤语录音…" : "转写已保留，正在翻译普通话…") : notice}</p>
@@ -230,7 +235,7 @@ export default function VoiceRecorder({ script, serviceName = "Groq", provider, 
         </div>)}</div>}
         <label className="sr-only" htmlFor="voice-transcript">粤语转写文本</label><textarea id="voice-transcript" value={transcript} disabled={busy || recording} placeholder="识别结果将在这里显示…" onChange={event => { setTranscript(event.target.value); setTranscriptState("edited"); setTranslationState("idle"); setTranslation(""); setError(""); setNotice(""); }} />
 
-        <button className="text-action" disabled={!transcript.trim() || busy || recording || Array.from(transcript).length > MAX_LENGTH} onClick={() => processAudio(true)}>{needsReview ? "已对照原音校对，翻译普通话" : "确认原文并翻译普通话"}</button>
+        <button className="text-action" disabled={!aiAvailable || !transcript.trim() || busy || recording || Array.from(transcript).length > MAX_LENGTH} onClick={() => processAudio(true)}>{needsReview ? "已对照原音校对，翻译普通话" : "确认原文并翻译普通话"}</button>
         {text && Array.from(text).length <= MAX_LENGTH && <JyutpingText key={text} text={text} suspectTexts={segments.filter(segment => segment.issue).map(segment => convertScript(segment.text, resolved))} />}
       </section>
       <section className={`result-card result-${translationState}`}><h3>普通话翻译 <small>{translationState === "success" ? "✓ 已翻译" : translationState === "error" ? "翻译失败 · 粤语原文已保留" : translationState === "blocked" ? "转写待校对 · 已暂停翻译" : translationState === "pending" ? "正在翻译" : "待翻译"}</small></h3>{translation ? <p className="voice-translation" lang="zh-CN">{convertScript(translation, resolved)}</p> : <p className="voice-help">{translationState === "blocked" ? "存在疑似未识别的片段，请先复听并校对左侧原文，避免将猜测当作译文。" : translationState === "error" ? "翻译未完成。左侧粤语原文已保留，可校对后点击“翻译普通话”重试。" : "转写完成后自动翻译；翻译失败时仍保留粤语原文。"}</p>}</section>

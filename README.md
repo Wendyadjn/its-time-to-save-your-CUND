@@ -2,7 +2,7 @@
 
 用于粤语学习的 Web 应用，支持粤普双向翻译、粤拼标注、互动朗读和录音转写，并可将学习内容保存到私有云端历史。
 
-当前版本：[v2.2.1](https://github.com/Wendyadjn/its-time-to-save-your-CUND/tree/v2.2.1) · [更新记录](CHANGELOG.md)
+当前版本：[v2.3](https://github.com/Wendyadjn/its-time-to-save-your-CUND/tree/v2.3) · [更新记录](CHANGELOG.md)
 
 ## 功能
 
@@ -28,6 +28,8 @@ npm run dev
 ```
 
 打开 [localhost:3000](http://localhost:3000/)。无需密钥即可尝试内置例句；自由文本翻译、转写和朗读需配置对应服务。已有 `.env.local` 时不要再次复制模板，以免覆盖配置。
+
+无密钥时不调用翻译、转写或朗读 API；页面分别提示各功能的配置状态。录音与上传后的本地试听不需要 API。预置示例音频将在后续版本加入，当前无密钥不提供语音合成。
 
 ### 按需配置服务
 

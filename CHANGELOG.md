@@ -1,5 +1,12 @@
 # 更新记录
 
+## [v2.3](https://github.com/Wendyadjn/its-time-to-save-your-CUND/tree/v2.3)
+
+- 固定直接依赖为当前 lockfile 的确切版本，声明 Node.js 22 及以上要求。
+- 按功能展示本地能力与联网服务配置状态，默认保留本地例句演示。
+- 未配置服务不发送真实翻译、转写或朗读请求；粤拼字卡和录音试听仍可用。
+- 云端历史保持可选，不更改已有密钥或强制用户配置全部服务。
+
 ## [v2.2.1](https://github.com/Wendyadjn/its-time-to-save-your-CUND/tree/v2.2.1)
 
 - 将粤语朗读的输入、粤拼和播放控制合并为一张单栏卡片，保留原有朗读与文本操作。

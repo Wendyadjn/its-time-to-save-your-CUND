@@ -6,7 +6,7 @@ import JyutpingText from "./jyutping-text";
 
 export default function HistoryPanel({ onOpen }: { onOpen: (item: HistoryItem) => void }) {
   const cloud = useCloudHistory();
-  if (!cloud.configured) return <section className="history-panel"><h2>历史记录</h2><p className="cloud-help">云端历史尚未连接。请填写项目连接资料并执行 Supabase 数据库权限脚本；当前翻译和录音仍可使用。</p></section>;
+  if (!cloud.configured) return <section className="history-panel"><h2>历史记录</h2><p className="cloud-help">云端历史是可选功能，当前未启用。无需登录即可使用例句、粤拼和本地录音试听；如需跨设备保存，再按 Supabase 指南配置。</p></section>;
   if (!cloud.user) return <section className="history-panel"><h2>历史记录</h2><p className="cloud-help">登录后查看自己保存的文字和原音，可在不同设备继续学习。</p><button className="primary" onClick={cloud.requestLogin}>登录 / 注册</button></section>;
   return <SignedHistory key={cloud.user.id} onOpen={onOpen} />;
 }

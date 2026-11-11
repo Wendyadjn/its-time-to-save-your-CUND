@@ -1,6 +1,6 @@
 {
   "name": "cantonese-master",
-  "version": "2.2.1",
+  "version": "2.3.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -10,22 +10,25 @@
     "test": "tsx --import ./tests/setup.mjs --test tests/*.test.ts"
   },
   "dependencies": {
-    "@ffprobe-installer/ffprobe": "^2.1.2",
-    "@supabase/supabase-js": "^2.119.0",
-    "lucide-react": "latest",
-    "next": "latest",
+    "@ffprobe-installer/ffprobe": "2.1.2",
+    "@supabase/supabase-js": "2.119.0",
+    "lucide-react": "1.61.0",
+    "next": "16.4.3",
     "opencc-js": "1.4.2",
-    "react": "latest",
-    "react-dom": "latest",
-    "to-jyutping": "^3.1.1"
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "to-jyutping": "3.1.1"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4",
-    "@types/node": "latest",
-    "@types/react": "latest",
-    "@types/react-dom": "latest",
-    "tailwindcss": "^4",
-    "tsx": "latest",
-    "typescript": "latest"
+    "@tailwindcss/postcss": "4.3.3",
+    "@types/node": "26.6.5",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "tailwindcss": "4.3.3",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2"
+  },
+  "engines": {
+    "node": ">=22.0.0"
   }
 }
