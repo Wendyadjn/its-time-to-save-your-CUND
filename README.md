@@ -2,7 +2,7 @@
 
 用于粤语学习的 Web 应用，支持粤普双向翻译、粤拼标注、互动朗读和录音转写，并可将学习内容保存到私有云端历史。
 
-当前版本：[v2.2](https://github.com/Wendyadjn/its-time-to-save-your-CUND/tree/v2.2) · [更新记录](CHANGELOG.md)
+当前版本：[v2.2.1](https://github.com/Wendyadjn/its-time-to-save-your-CUND/tree/v2.2.1) · [更新记录](CHANGELOG.md)
 
 ## 功能
 

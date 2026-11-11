@@ -1,5 +1,9 @@
 # 更新记录
 
+## [v2.2.1](https://github.com/Wendyadjn/its-time-to-save-your-CUND/tree/v2.2.1)
+
+- 将粤语朗读的输入、粤拼和播放控制合并为一张单栏卡片，保留原有朗读与文本操作。
+
 ## [v2.2](https://github.com/Wendyadjn/its-time-to-save-your-CUND/tree/v2.2)
 
 - 新增独立“粤语朗读”页签，直接输入粤语段落显示粤拼，不调用翻译服务。
